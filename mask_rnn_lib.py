@@ -20,9 +20,16 @@ class MaskRNN(object):
         iters_to_report,
         ):
     	'''
-    	(T: seq size, N: batch size, D: input dim)
-    	seq_lengths: np.array of (N, 1) with each element is the seq length.
+        The db contains: (T: seq length, N: batch size, D: input dim, E: output dim)
+    	   seq_lengths: np.array of (N, 1) with each element is the seq length.
+           input_blob: the concat (axis = 2) of:
+            - inputs: np.float32 T * N * D
+            - inputs_mean: np.float32 T * N * D
+            - masks: np.float32 T * N * D (same size as the inputs)
+            - interval: np.float32 T * N * D (same size as the inputs)
+           target: np.float32 T * N * E
     	'''
+        self.db_name = db_name
         self.batch_size = batch_size
         self.input_dim = input_dim
         self.output_dim = output_dim
@@ -34,16 +41,16 @@ class MaskRNN(object):
         log.debug('Start Building Mask-RNN')
         model = model_helper.ModelHelper(name="mask_rnn")
 
-        input_blob, seq_lengths, \
+
+        seq_lengths, input_blob, \
             hidden_init, target = model.net.AddExternalInputs(
-                'input_blob',
                 'seq_lengths',
+                'input_blob',
                 'hidden_init',
                 'target',
         )
-        # the input sequence in a format T x N x D
-        # where T: sequence size (i.e. time), N: batch size and D: input dimension
-        hidden_output_all, self.hidden_output = GRU(
+
+        hidden_output_all, self.hidden_output = MaskGRU(
             model, input_blob, seq_lengths, [hidden_init],
             self.input_dim, self.batch_size, scope="MaskRNN"
         )
@@ -90,32 +97,33 @@ class MaskRNN(object):
         log.debug("Training model")
 
         workspace.RunNetOnce(self.model.param_init_net)
-
         # Writing to output states which will be copied to input
         # states within the loop below
         workspace.FeedBlob(self.hidden_output, np.zeros(
             [1, self.batch_size, self.hidden_size], dtype=np.float32
         ))
         workspace.CreateNet(self.prepare_state)
-
         # Copy hidden_ouput to hidden_init
         workspace.RunNet(self.prepare_state.Name())
 
         # Add external inputs
-		workspace.FeedBlob("seq_lengths", self.seq_lengths)
-		# inputs: np.float32 [self.seq_length, self.batch_size, self.input_dim]
-		# target: np.float32 [self.seq_length, self.batch_size, self.output_dim]
-        workspace.FeedBlob('input_blob', inputs)
-        workspace.FeedBlob('target', target)
+        inputs = build_input_reader(self.model, self.db_name, 'minidb', 
+            ['seq_lengths', 'input_blob', 'target'], 
+            batch_size = 3, data_type='train')
+		workspace.FeedBlob('seq_lengths', inputs[0])
+        workspace.FeedBlob('input_blob', inputs[1]) # concat of ...
+        workspace.FeedBlob('target', inputs[2])
 
         CreateNetOnce(self.model.net)
-        workspace.RunNet(self.model.net.Name())
+
+        for i in range(self.iters):
+            workspace.RunNet(self.model.net.Name())
+            workspace.RunNet(self.prepare_state.Name())
 
 
-
-def main():        # print(model)
+def main():
     my_model = MaskRNN(
-        seq_length=5,
+        'test.minidb',
         batch_size=3,
         input_dim=10,
         output_dim=1,
