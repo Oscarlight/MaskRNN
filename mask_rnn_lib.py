@@ -1,60 +1,92 @@
 import caffe2_path
 from caffe2.python import (
-    core, workspace, model_helper, utils, brew
+    core, workspace, model_helper, utils, brew, net_drawer
 )
-from caffe2.python.gru_cell import GRU
+from mask_gru_cell import MaskGRU
 from caffe2.python.optimizer import build_adam
+from data_reader import build_input_reader
+import numpy as np
 import logging
+
 logging.basicConfig()
 log = logging.getLogger("mask_rnn")
 log.setLevel(logging.DEBUG)
 
+# Default set() here is intentional as it would accumulate values like a global
+# variable
+def CreateNetOnce(net, created_names=set()): # noqa
+    name = net.Name()
+    if name not in created_names:
+        created_names.add(name)
+        workspace.CreateNet(net)
+
 class MaskRNN(object):
-    def __init__(self, 
+    def __init__(
+        self,
+        model_name, 
         db_name,
+        seq_size,
         batch_size, 
         input_dim,
         output_dim,
         hidden_size,
-        iters,
-        iters_to_report,
         ):
     	'''
         The db contains: (T: seq length, N: batch size, D: input dim, E: output dim)
     	   seq_lengths: np.array of (N, 1) with each element is the seq length.
            input_blob: the concat (axis = 2) of:
             - inputs: np.float32 T * N * D
+            - inputs_last: np.float32 T * N * D
             - inputs_mean: np.float32 T * N * D
             - masks: np.float32 T * N * D (same size as the inputs)
             - interval: np.float32 T * N * D (same size as the inputs)
            target: np.float32 T * N * E
     	'''
+        workspace.ResetWorkspace()
+        self.model_name = model_name
         self.db_name = db_name
+        self.seq_size = seq_size
         self.batch_size = batch_size
         self.input_dim = input_dim
         self.output_dim = output_dim
         self.hidden_size = hidden_size
-        self.iters = iters
-        self.iters_to_report = iters_to_report
+        self.net_store = {}
 
-    def build_net(self):
+    def build_net(
+        self,
+        base_learning_rate=0.1  # base_learning_rate * seq_size
+        ):
         log.debug('Start Building Mask-RNN')
         model = model_helper.ModelHelper(name="mask_rnn")
 
-
-        seq_lengths, input_blob, \
-            hidden_init, target = model.net.AddExternalInputs(
-                'seq_lengths',
-                'input_blob',
-                'hidden_init',
-                'target',
+        hidden_init= model.net.AddExternalInputs(
+            'hidden_init',
         )
+
+        # Add external inputs (read directly from the database)
+        seq_lengths, _input_blob, _target = build_input_reader(
+            model, self.db_name, 'minidb', 
+            ['seq_lengths', 
+             'input_blob_batch_first', 
+             'target_batch_first'], 
+            batch_size = self.batch_size, data_type='train'
+        )
+        # In order to put into batches, the input_blob is
+        # [BATCH_SIZE, SEQ_LEN, INPUT_DIM] 
+        # i.e. the first dim is the batch size 
+        # However the required input dim is:
+        # [SEQ_LEN, BATCH_SIZE, INPUT_DIM]
+        input_blob = model.net.Transpose(
+            [_input_blob], 'input_blob', axes=[1, 0, 2])
+        target = model.net.Transpose(
+            [_target], 'target', axes=[1, 0, 2])
 
         hidden_output_all, self.hidden_output = MaskGRU(
             model, input_blob, seq_lengths, [hidden_init],
-            self.input_dim, self.batch_size, scope="MaskRNN"
+            self.input_dim, self.hidden_size, scope="MaskRNN"
         )
 
+        # axis is 2 as first two are T (time) and N (batch size).
         output = brew.fc(
             model,
             hidden_output_all,
@@ -63,16 +95,26 @@ class MaskRNN(object):
             dim_out=self.output_dim,
             axis=2
         )
-        # axis is 2 as first two are T (time) and N (batch size).
+
+        # Get the predict net
+        (self.net_store['predict'], 
+            self.external_inputs) = model_helper.ExtractPredictorNet(
+            model.net.Proto(),
+            [input_blob, seq_lengths, hidden_init],
+            [output],
+        )
+
+        # TODO: print out output and output_reshaped, check dimension
+
+        # Then, we add loss and gradient ops
         # We treat them as one big batch of size T * N
         output_reshaped, _ = model.net.Reshape(
-            output, ['output_reshaped', '_'], shape=[-1, self.input_dim])
+            output, ['output_reshaped', '_output_shape'], 
+            shape=[-1, self.output_dim])
+        target, _ = model.net.Reshape(
+            target, ['target_reshaped', '_target_shape'], 
+            shape=[-1, self.output_dim])
 
-        # Create a copy of the current net. We will use it on the forward
-        # pass where we don't need loss and backward operators
-        self.predit_net = core.Net(model.net.Proto())
-
-        # Add loss
         l2_dist = model.net.SquaredL2Distance(
             [output_reshaped, target], 'l2_dist')
         loss = model.net.AveragedLoss(l2_dist, 'loss')
@@ -81,7 +123,7 @@ class MaskRNN(object):
         model.AddGradientOperators([loss])
         build_adam(
             model,
-            base_learning_rate=0.1 * self.seq_length,
+            base_learning_rate=base_learning_rate*self.seq_size,
         )
 
         self.model = model
@@ -89,48 +131,65 @@ class MaskRNN(object):
         self.loss = loss
 
         # Create a net to copy hidden_output to hidden_init
-        self.prepare_state = core.Net("prepare_state")
-        self.prepare_state.Copy(self.hidden_output, hidden_init)
-        # print(str(self.prepare_state.Proto()))
+        prepare_state = core.Net("prepare_state")
+        prepare_state.Copy(self.hidden_output, hidden_init)
+        self.net_store['prepare'] = prepare_state
 
-    def train(self):
+    def train(
+        self, 
+        iters,
+        iters_to_report=0, 
+        ):
         log.debug("Training model")
 
         workspace.RunNetOnce(self.model.param_init_net)
-        # Writing to output states which will be copied to input
+        # initialize the output states which will be copied to input
         # states within the loop below
         workspace.FeedBlob(self.hidden_output, np.zeros(
             [1, self.batch_size, self.hidden_size], dtype=np.float32
         ))
-        workspace.CreateNet(self.prepare_state)
-        # Copy hidden_ouput to hidden_init
-        workspace.RunNet(self.prepare_state.Name())
+        # Create the prepare net and train net
+        workspace.CreateNet(self.net_store['prepare'])
 
-        # Add external inputs
-        inputs = build_input_reader(self.model, self.db_name, 'minidb', 
-            ['seq_lengths', 'input_blob', 'target'], 
-            batch_size = 3, data_type='train')
-		workspace.FeedBlob('seq_lengths', inputs[0])
-        workspace.FeedBlob('input_blob', inputs[1]) # concat of ...
-        workspace.FeedBlob('target', inputs[2])
-
-        CreateNetOnce(self.model.net)
-
-        for i in range(self.iters):
+        for i in range(iters):
+            print('>>> iter: ' + str(i))
+            # Reset output state
+            workspace.FeedBlob(self.hidden_output, np.zeros(
+                [1, self.batch_size, self.hidden_size], dtype=np.float32
+            ))
+            # Copy hidden_ouput to hidden_init
+            workspace.RunNet(self.net_store['prepare'].Name())
+            CreateNetOnce(self.model.net)
             workspace.RunNet(self.model.net.Name())
-            workspace.RunNet(self.prepare_state.Name())
 
+    def draw_nets(self):
+        for net_name in self.net_store:
+            net = self.net_store[net_name]
+            graph = net_drawer.GetPydotGraph(net.Proto().op, rankdir='TB')
+            with open(self.model_name + '_' + net.Name() + ".png",'wb') as f:
+                f.write(graph.create_png())
+            with open(self.model_name + '_' + net.Name() + "_proto.txt",'wb') as f:
+                f.write(str(net.Proto()))
 
 def main():
+    SEQ_LEN = 5
+    NUM_EXAMPLE = 10
+    INPUT_DIM = 2
+    OUTPUT_DIM = 1
     my_model = MaskRNN(
+        'MaskRNN_test',
         'test.minidb',
-        batch_size=3,
-        input_dim=10,
-        output_dim=1,
-        hidden_size=4,
-        iters_to_report=1,
+        seq_size=SEQ_LEN,
+        batch_size=10,
+        input_dim=INPUT_DIM,
+        output_dim=OUTPUT_DIM,
+        hidden_size=6,
     )
-    my_model.build_net()
+    my_model.build_net(base_learning_rate=0.1)
+    my_model.draw_nets()
+    my_model.train(
+        iters=1
+    )
 
 if __name__ == '__main__':
     main()

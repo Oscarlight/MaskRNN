@@ -4,7 +4,8 @@ from __future__ import print_function
 from __future__ import unicode_literals
 
 import functools
-from caffe2.python import brew, rnn_cell
+from caffe2.python import brew, rnn_cell, scope
+import numpy as np
 
 
 class MaskGRUCell(rnn_cell.RNNCell):
@@ -18,7 +19,7 @@ class MaskGRUCell(rnn_cell.RNNCell):
         drop_states=False,
         **kwargs
     ):
-        super(GRUCell, self).__init__(**kwargs)
+        super(MaskGRUCell, self).__init__(**kwargs)
         self.input_size = input_size
         self.hidden_size = hidden_size
         self.forget_bias = float(forget_bias)
@@ -41,37 +42,40 @@ class MaskGRUCell(rnn_cell.RNNCell):
     ):
         hidden_t_prev = states[0]
 
-        split_info = model.net.GivenTensorIntFill(
-            [], self.scope("split_info"), 
-            values = [self.hidden_size, self.hidden_size, 
-                self.hidden_size, self.input_size]
-        )
+        ## If we need the intervals to apply decay on hidden state
+        # split_info = model.net.GivenTensorIntFill(
+        #     [], self.scope("split_info"),
+        #     values = np.array([[
+        #         self.hidden_size, self.hidden_size, 
+        #         self.hidden_size, self.input_size]])
+        # )
+
         # Split input tensors to get inputs for each gate.
         (input_t_reset, input_t_update, 
-            input_t_output, intervals) = model.net.Split(
+            input_t_output) = model.net.Split(
             [
                 input_t,
-                split_info
+                # split_info
             ],
             [
                 self.scope('input_t_reset'),
                 self.scope('input_t_update'),
                 self.scope('input_t_output'),
-                self.scope('intervals')
+                # self.scope('intervals')
             ],
             axis=2,
         )
         # decay on hidden state
-        decays = self.build_decay(
-            model, intervals, 
-            self.input_size, self.hidden_size, 
-            'hidden_decay'
-        )
-        hidden_t_prev = model.net.Mul(
-            [hidden_t_prev, decays],
-            self.scope('decayed_hidden_t_prev'),
-            broadcast=0
-        )
+        # decays = self.build_decay(
+        #     model, intervals, 
+        #     self.input_size, self.hidden_size, 
+        #     'hidden_decay'
+        # )
+        # hidden_t_prev = model.net.Mul(
+        #     [hidden_t_prev, decays],
+        #     self.scope('decayed_hidden_t_prev'),
+        #     broadcast=0
+        # )
 
         # Fully connected layers for reset and update gates.
         reset_gate_t = brew.fc(
@@ -160,7 +164,7 @@ class MaskGRUCell(rnn_cell.RNNCell):
         output_size, 
         namescope
     ):
-        with self.scope.NameScope(namescope):
+        with scope.NameScope(namescope):
             decays = brew.fc(
                 model,
                 intervals,
@@ -170,7 +174,7 @@ class MaskGRUCell(rnn_cell.RNNCell):
                 axis=2,
             )
             ZEROS = model.net.ConstantFill(
-                [intervals_fc], 
+                [decays], 
                 self.scope("ZEROS"), value=0.0
             )
             # in-place update
@@ -186,14 +190,17 @@ class MaskGRUCell(rnn_cell.RNNCell):
                 [decays],
                 self.scope("decays")
             )
+        return decays
 
 
     def prepare_input(self, model, input_blob):
         '''
-        input_blob: the concat (axis = 2) of:
+           input_blob: the concat (axis = 2) of:
             - inputs: np.float32 T * N * D
+            - inputs_last: np.float32 T * N * D
+            - inputs_mean: np.float32 T * N * D
             - masks: np.float32 T * N * D (same size as the inputs)
-            - intervals: np.float32 T * N * D (same size as the inputs)
+            - interval: np.float32 T * N * D (same size as the inputs)
         '''
         # Split input blobs to get inputs for ...
         # equal-sized split
@@ -218,10 +225,6 @@ class MaskGRUCell(rnn_cell.RNNCell):
             'input_decay'
         )
         # Apply mask and decay to input_features
-        masked_inputs_1 = model.net.Mul(
-            [masks, inputs],
-            self.scope("masked_inputs_1")
-        )
         ONES = model.net.ConstantFill(
             [masks], 
             self.scope("ONES"), value=1.0
@@ -241,7 +244,7 @@ class MaskGRUCell(rnn_cell.RNNCell):
         masked_decayed_inputs_last = model.net.Mul(
             [one_minus_masks, 
                 model.net.Mul(
-                    [decays, inputs_last]
+                    [decays, inputs_last],
                     self.scope("decayed_inputs_last"), 
                     broadcast=0
                 )
@@ -252,7 +255,7 @@ class MaskGRUCell(rnn_cell.RNNCell):
         masked_decayed_inputs_mean = model.net.Mul(
             [one_minus_masks, 
                 model.net.Mul(
-                    [one_minus_decays, inputs_mean]
+                    [one_minus_decays, inputs_mean],
                     self.scope("decayed_inputs_mean"), 
                     broadcast=0
                 )
@@ -267,7 +270,7 @@ class MaskGRUCell(rnn_cell.RNNCell):
                      masked_decayed_inputs_mean],
                     self.scope("sum_input_last_mean"), 
                     broadcast=0
-                )]
+                )],
             self.scope("masked_inputs"),   
             broadcast=0
         )
@@ -292,12 +295,14 @@ class MaskGRUCell(rnn_cell.RNNCell):
             self.scope("inputs_masks_blob"), 
             broadcast=0            
         )
-        combined_inputs = model.net.Concat(
-            [inputs_masks_blob, intervals],
-            self.scope('combined_inputs'),
-            axis=2
-        )
-        return combined_inputs
+        # combined_inputs, _ = model.net.Concat(
+        #     [inputs_masks_blob, intervals],
+        #     [self.scope('combined_inputs'),
+        #      self.scope('_combined_inputs_concat_dims')],
+        #     axis=2
+        # )
+        # return combined_inputs
+        return inputs_masks_blob
 
     def get_state_names(self):
         return (self.scope('hidden_t'),)
