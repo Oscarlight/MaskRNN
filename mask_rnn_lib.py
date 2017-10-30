@@ -8,6 +8,7 @@ from caffe2.python.optimizer import build_adam
 from data_reader import build_input_reader
 import numpy as np
 import logging
+import matplotlib.pyplot as plt
 
 logging.basicConfig()
 log = logging.getLogger("mask_rnn")
@@ -52,12 +53,16 @@ class MaskRNN(object):
         self.output_dim = output_dim
         self.hidden_size = hidden_size
         self.net_store = {}
+        self.reports = {
+            'epoch' : [],
+            'train_loss' : []
+        }
 
     def build_net(
         self,
         base_learning_rate=0.1  # base_learning_rate * seq_size
         ):
-        log.debug('Start Building Mask-RNN')
+        log.debug('>>> Building Mask-RNN')
         model = model_helper.ModelHelper(name="mask_rnn")
 
         hidden_init= model.net.AddExternalInputs(
@@ -103,7 +108,7 @@ class MaskRNN(object):
         )
 
         # classification head
-        output = model.net.Softmax(output, 'softmax', axis=2)
+        # output = model.net.Softmax(output, 'softmax', axis=2)
 
         # TODO: @mingda
         # add regression head
@@ -148,9 +153,9 @@ class MaskRNN(object):
     def train(
         self, 
         iters,
-        iters_to_report=0, 
+        iters_to_report=1, 
         ):
-        log.debug("Training model")
+        log.debug(">>> Training Mask-RNN")
 
         workspace.RunNetOnce(self.model.param_init_net)
         # initialize the output states which will be copied to input
@@ -161,8 +166,7 @@ class MaskRNN(object):
         # Create the prepare net and train net
         workspace.CreateNet(self.net_store['prepare'])
 
-        for i in range(iters):
-            print('>>> iter: ' + str(i))
+        for num_iter in range(iters):
             # Reset output state
             workspace.FeedBlob(self.hidden_output, np.zeros(
                 [1, self.batch_size, self.hidden_size], dtype=np.float32
@@ -170,8 +174,14 @@ class MaskRNN(object):
             # Copy hidden_ouput to hidden_init
             workspace.RunNet(self.net_store['prepare'].Name())
             CreateNetOnce(self.model.net)
-            print('>>> Run the net')
             workspace.RunNet(self.model.net.Name())
+
+            if num_iter % iters_to_report == 0:
+                self.reports['epoch'].append(num_iter)
+                self.reports['train_loss'].append(
+                    workspace.FetchBlob('loss')
+                )
+
 
     def draw_nets(self, plot_train=False):
         for net_name in self.net_store:
@@ -182,6 +192,15 @@ class MaskRNN(object):
                     f.write(graph.create_png())
             with open(self.model_name + '_' + net.Name() + "_proto.txt",'wb') as f:
                 f.write(str(net.Proto()))
+
+    def plot_loss_trend(self):
+        plt.plot(
+            self.reports['epoch'], 
+            self.reports['train_loss'], 'r', 
+            label='train error'
+        )
+        plt.show()
+
 
 def main():
     SEQ_LEN = 5
@@ -200,8 +219,9 @@ def main():
     my_model.build_net(base_learning_rate=0.1)
     my_model.draw_nets()
     my_model.train(
-        iters=2
+        iters=10
     )
+    my_model.plot_loss_trend()
 
 if __name__ == '__main__':
     main()
