@@ -192,7 +192,6 @@ class MaskGRUCell(rnn_cell.RNNCell):
             )
         return decays
 
-
     def prepare_input(self, model, input_blob):
         '''
            input_blob: the concat (axis = 2) of:
@@ -201,6 +200,18 @@ class MaskGRUCell(rnn_cell.RNNCell):
             - inputs_mean: np.float32 T * N * D
             - masks: np.float32 T * N * D (same size as the inputs)
             - interval: np.float32 T * N * D (same size as the inputs)
+           Note: Don't set broadcast = 0 for elementwise ops, it will lead to
+                errors in the backwards path!
+                A.ndim() > B.ndim(). 3 vs 3. If you are doing ReduceSumLike, 
+                input1 should have a smaller number of dimensions. 
+                Error from operator: 
+                  input: "MaskRNN/inputs_masks_blob_grad" 
+                  input: "MaskRNN/masked_inputs_hidden" 
+                  output: "MaskRNN/masked_inputs_hidden_grad" 
+                  name: "" 
+                  type: "SumReduceLike" 
+                  arg { name: "broadcast" i: 0 } 
+                  is_gradient_op: true    
         '''
         # Split input blobs to get inputs for ...
         # equal-sized split
@@ -231,37 +242,40 @@ class MaskGRUCell(rnn_cell.RNNCell):
         )
         one_minus_masks = model.net.Sub(
             [ONES, masks],
-            self.scope("one_minus_masks"), broadcast=0
+            self.scope("one_minus_masks"), 
+            # broadcast=0
         )
         one_minus_decays = model.net.Sub(
             [ONES, decays],
-            self.scope("one_minus_decays"), broadcast=0
+            self.scope("one_minus_decays"), 
+            # broadcast=0
         )
         masked_inputs = model.net.Mul(
             [masks, inputs],
-            self.scope("masked_inputs_1"), broadcast=0
+            self.scope("masked_inputs_1"), 
+            # broadcast=0
         )  
         masked_decayed_inputs_last = model.net.Mul(
             [one_minus_masks, 
                 model.net.Mul(
                     [decays, inputs_last],
                     self.scope("decayed_inputs_last"), 
-                    broadcast=0
+                    # broadcast=0
                 )
             ],
             self.scope("masked_decayed_inputs_last"), 
-            broadcast=0
+            # broadcast=0
         )
         masked_decayed_inputs_mean = model.net.Mul(
             [one_minus_masks, 
                 model.net.Mul(
                     [one_minus_decays, inputs_mean],
                     self.scope("decayed_inputs_mean"), 
-                    broadcast=0
+                    # broadcast=0
                 )
             ],
             self.scope("masked_decayed_inputs_mean"), 
-            broadcast=0
+            # broadcast=0
         )    
         masked_inputs = model.net.Add(
             [masked_inputs, 
@@ -269,10 +283,10 @@ class MaskGRUCell(rnn_cell.RNNCell):
                     [masked_decayed_inputs_last, 
                      masked_decayed_inputs_mean],
                     self.scope("sum_input_last_mean"), 
-                    broadcast=0
+                    # broadcast=0
                 )],
             self.scope("masked_inputs"),   
-            broadcast=0
+            # broadcast=0
         )
         masked_inputs_hidden = brew.fc(
             model,
@@ -291,9 +305,9 @@ class MaskGRUCell(rnn_cell.RNNCell):
             axis=2,
         )
         inputs_masks_blob = model.net.Add(
-            [masked_inputs_hidden, masks_hidden],
+            [masks_hidden, masked_inputs_hidden],
             self.scope("inputs_masks_blob"), 
-            broadcast=0            
+            # broadcast=0           
         )
         # combined_inputs, _ = model.net.Concat(
         #     [inputs_masks_blob, intervals],

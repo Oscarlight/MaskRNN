@@ -1,7 +1,8 @@
 import caffe2_path
 from caffe2.python import (
-    core, workspace, model_helper, utils, brew, net_drawer
+    core, workspace, model_helper, utils, brew, net_drawer, 
 )
+# from caffe2.python.gru_cell import GRU
 from mask_gru_cell import MaskGRU
 from caffe2.python.optimizer import build_adam
 from data_reader import build_input_reader
@@ -62,7 +63,12 @@ class MaskRNN(object):
         hidden_init= model.net.AddExternalInputs(
             'hidden_init',
         )
-
+        # TODO: do I still need this?
+        model.net.AddExternalInputs(
+            'input_blob',
+            'seq_lengths',
+            'target',
+        )
         # Add external inputs (read directly from the database)
         seq_lengths, _input_blob, _target = build_input_reader(
             model, self.db_name, 'minidb', 
@@ -82,7 +88,7 @@ class MaskRNN(object):
             [_target], 'target', axes=[1, 0, 2])
 
         hidden_output_all, self.hidden_output = MaskGRU(
-            model, input_blob, seq_lengths, [hidden_init],
+            model, input_blob, seq_lengths, (hidden_init,),
             self.input_dim, self.hidden_size, scope="MaskRNN"
         )
 
@@ -96,6 +102,12 @@ class MaskRNN(object):
             axis=2
         )
 
+        # classification head
+        output = model.net.Softmax(output, 'softmax', axis=2)
+
+        # TODO: @mingda
+        # add regression head
+
         # Get the predict net
         (self.net_store['predict'], 
             self.external_inputs) = model_helper.ExtractPredictorNet(
@@ -103,9 +115,6 @@ class MaskRNN(object):
             [input_blob, seq_lengths, hidden_init],
             [output],
         )
-
-        # TODO: print out output and output_reshaped, check dimension
-
         # Then, we add loss and gradient ops
         # We treat them as one big batch of size T * N
         output_reshaped, _ = model.net.Reshape(
@@ -134,6 +143,7 @@ class MaskRNN(object):
         prepare_state = core.Net("prepare_state")
         prepare_state.Copy(self.hidden_output, hidden_init)
         self.net_store['prepare'] = prepare_state
+        self.net_store['train'] = core.Net(model.net.Proto())
 
     def train(
         self, 
@@ -160,14 +170,16 @@ class MaskRNN(object):
             # Copy hidden_ouput to hidden_init
             workspace.RunNet(self.net_store['prepare'].Name())
             CreateNetOnce(self.model.net)
+            print('>>> Run the net')
             workspace.RunNet(self.model.net.Name())
 
-    def draw_nets(self):
+    def draw_nets(self, plot_train=False):
         for net_name in self.net_store:
             net = self.net_store[net_name]
-            graph = net_drawer.GetPydotGraph(net.Proto().op, rankdir='TB')
-            with open(self.model_name + '_' + net.Name() + ".png",'wb') as f:
-                f.write(graph.create_png())
+            if net_name != 'train' or plot_train:
+                graph = net_drawer.GetPydotGraph(net.Proto().op, rankdir='TB')
+                with open(self.model_name + '_' + net.Name() + ".png",'wb') as f:
+                    f.write(graph.create_png())
             with open(self.model_name + '_' + net.Name() + "_proto.txt",'wb') as f:
                 f.write(str(net.Proto()))
 
@@ -188,7 +200,7 @@ def main():
     my_model.build_net(base_learning_rate=0.1)
     my_model.draw_nets()
     my_model.train(
-        iters=1
+        iters=2
     )
 
 if __name__ == '__main__':

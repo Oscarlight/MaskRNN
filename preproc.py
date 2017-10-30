@@ -3,7 +3,7 @@ from data_reader import write_db
 import numpy as np
 import os
 # example input data
-SEQ_LEN = 5
+SEQ_LEN = 12
 NUM_EXAMPLE = 10
 INPUT_DIM = 2
 OUTPUT_DIM = 1
