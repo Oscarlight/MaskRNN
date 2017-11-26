@@ -6,7 +6,8 @@ import os
 SEQ_LEN = 12
 NUM_EXAMPLE = 10
 INPUT_DIM = 2
-OUTPUT_DIM = 1
+CLASS_OUTPUT_DIM = 2
+REGRE_OUTPUT_DIM = 2
 
 # In order to put into batches, the input is
 # [NUM_EXAMPLE, SEQ_LEN, INPUT_DIM] 
@@ -39,17 +40,38 @@ interval = np.random.randint(
 	3, size=(NUM_EXAMPLE, SEQ_LEN, INPUT_DIM)
 ).astype(np.float32)
 
-target = np.ones(
-	(NUM_EXAMPLE, SEQ_LEN, OUTPUT_DIM)
+# target
+_class_target_0 = np.zeros(
+	(NUM_EXAMPLE, SEQ_LEN, CLASS_OUTPUT_DIM - 1)
 ).astype(np.float32)
+_class_target_1 = np.ones(
+	(NUM_EXAMPLE, SEQ_LEN, 1)
+).astype(np.float32)
+
+class_target = np.concatenate((_class_target_0, _class_target_1), axis=2)
+
+print(class_target.shape)
+
+class_target_mask = np.random.randint(
+	2, size=(NUM_EXAMPLE, SEQ_LEN, 1)
+).astype(np.float32)
+
+regre_target = np.ones(
+	(NUM_EXAMPLE, SEQ_LEN, REGRE_OUTPUT_DIM)
+).astype(np.float32)
+
+regre_target_mask = np.random.randint(
+	2, size=(NUM_EXAMPLE, SEQ_LEN, REGRE_OUTPUT_DIM)
+).astype(np.float32)
+
 
 inputs = np.concatenate((x, x, x_mean, mask, interval), axis=2)
 print(x.shape, x_mean.shape, mask.shape, interval.shape)
-print(seq_lens.shape, target.shape)
+print(seq_lens.shape)
 print(inputs.shape)
 
 db_name = 'test.minidb'
 if os.path.isfile(db_name): 
 	os.remove(db_name)
 write_db('minidb', db_name, 
-	[seq_lens, inputs, target])
+	[seq_lens, inputs, class_target, regre_target, class_target_mask, regre_target_mask])
