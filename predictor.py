@@ -7,7 +7,7 @@ from eval import MAUC, calcBCA
 import matplotlib.pyplot as plt
 
 SEQ_LEN = 19
-HIDDEN_DIM = 32
+HIDDEN_DIM = 256
 
 def predict(model_name, seq_lens, inputs, index):
 	inputs = np.transpose(inputs, (1, 0, 2))
@@ -70,12 +70,14 @@ def compute_mAUC_BCA(class_output, class_target, class_mask, start_end_index):
 
 if __name__ == '__main__':
 	data_path = './data/'
-	model_name = 'model4/MaskRNN'
-	index = 1000
+	model_name = 'model3/MaskRNN'
+	# index = 100
 	tar_mean = np.load(data_path + 'tar_mean.npy').astype(np.float32)
 	tar_std = np.load(data_path + 'tar_std.npy').astype(np.float32)
 	error={'epoch':[],'train':[], 'valid':[], 'test':[]}
-	for index in list(np.linspace(100, 900, num=9)) + [999]
+	# for index in list(np.linspace(100, 900, num=9).astype(np.int32)) + [999]:
+	for index in list(np.linspace(100, 200, num=2).astype(np.int32)):
+		print('>> computing for ' + str(index))
 		# tests
 		for data_type in ['train','valid','test']:
 			(test_seq_lens, test_features, 
@@ -94,9 +96,22 @@ if __name__ == '__main__':
 				test_targets[:,:,7:10], test_start_end_index)
 			)
 
-	for i, title in enumerate['mAUC', 'BCA', 'vennorm', 'adas13', 'mmse']:
-		for data_type in ['train','valid','test']:
-			i
+	errors_by_type = {'mAUC':[], 'BCA':[], 'vennorm':[], 'adas13':[], 'mmse':[]}
+	assert len(error['train'])==10
+	for j in range(len(error['train'])): # epochs
+		for i, title in enumerate(['mAUC', 'BCA', 'vennorm', 'adas13', 'mmse']):
+			error_tvt = [error[data_type][j][i] for data_type in ['train','valid','test']]
+			
+		errors_by_type[title].append(error_tvt)
+
+	for i, title in enumerate(['mAUC', 'BCA', 'vennorm', 'adas13', 'mmse']):
+		err_array = np.array(errors_by_type[title])
+		# print(err_array)
+		plt.plot(error['epoch'], err_array[:,0], label = 'train')
+		plt.plot(error['epoch'], err_array[:,1], label = 'valid')
+		plt.plot(error['epoch'], err_array[:,2], label = 'test')
+		plt.legend()
+		plt.savefig(title + '.png')
 
 
 		
