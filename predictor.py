@@ -6,8 +6,7 @@ from caffe2.python import (
 from eval import MAUC, calcBCA
 import matplotlib.pyplot as plt
 
-SEQ_LEN = 19
-HIDDEN_DIM = 256
+HIDDEN_DIM = 128
 
 def predict(model_name, seq_lens, inputs, index):
 	inputs = np.transpose(inputs, (1, 0, 2))
@@ -70,48 +69,54 @@ def compute_mAUC_BCA(class_output, class_target, class_mask, start_end_index):
 
 if __name__ == '__main__':
 	data_path = './data/'
-	model_name = 'model3/MaskRNN'
+	model_name = 'model6/MaskRNN'
 	# index = 100
 	tar_mean = np.load(data_path + 'tar_mean.npy').astype(np.float32)
 	tar_std = np.load(data_path + 'tar_std.npy').astype(np.float32)
-	error={'epoch':[],'train':[], 'valid':[], 'test':[]}
-	# for index in list(np.linspace(100, 900, num=9).astype(np.int32)) + [999]:
-	for index in list(np.linspace(100, 200, num=2).astype(np.int32)):
-		print('>> computing for ' + str(index))
-		# tests
-		for data_type in ['train','valid','test']:
-			(test_seq_lens, test_features, 
-				test_targets, test_start_end_index) = load_data(data_path, data_type)		
-			target = predict(model_name, test_seq_lens, test_features, index)
-			if data_type == 'train':
-				test_regre_target = np.multiply(test_targets[:,:,3:6], tar_std) + tar_mean
-			else:
-				test_regre_target = test_targets[:,:,3:6]
-			test_regre_output = np.multiply(target[1], tar_std) + tar_mean
-			error['epoch'].append(index)
-			error[data_type].append(
-				compute_mAUC_BCA(target[1], test_targets[:,:,0:3], 
-				test_targets[:,:,6:7], test_start_end_index) +
-				compute_regre_error(test_regre_output, test_regre_target, 
-				test_targets[:,:,7:10], test_start_end_index)
-			)
+	# train, valid, test
+	error = {'train':[], 'valid':[], 'test':[]}
+	epochs = list(np.linspace(100, 900, num=9).astype(np.int32)) + [999]
+	# tests
+	for data_type in ['train','valid','test']:
+		(test_seq_lens, test_features, 
+			test_targets, test_start_end_index) = load_data(data_path, data_type)		
+		if data_type == 'train':
+			test_regre_target = np.multiply(test_targets[:,:,3:6], tar_std) + tar_mean
+		else:
+			test_regre_target = test_targets[:,:,3:6]
+		# test_regre_target = np.multiply(test_targets[:,:,3:6], tar_std) + tar_mean
 
+		for index in epochs:
+			print('>> computing for ' + str(index))
+			target = predict(model_name, test_seq_lens, test_features, index)
+			test_regre_output = np.multiply(target[1], tar_std) + tar_mean
+			class_res = compute_mAUC_BCA(target[1], test_targets[:,:,0:3], 
+				test_targets[:,:,6:7], test_start_end_index)
+			reg_res = compute_regre_error(test_regre_output, test_regre_target, 
+				test_targets[:,:,7:10], test_start_end_index)
+			error[data_type].append(class_res + reg_res)
+
+	# print(error)
+	# quit()
 	errors_by_type = {'mAUC':[], 'BCA':[], 'vennorm':[], 'adas13':[], 'mmse':[]}
 	assert len(error['train'])==10
 	for j in range(len(error['train'])): # epochs
 		for i, title in enumerate(['mAUC', 'BCA', 'vennorm', 'adas13', 'mmse']):
 			error_tvt = [error[data_type][j][i] for data_type in ['train','valid','test']]
-			
-		errors_by_type[title].append(error_tvt)
+			errors_by_type[title].append(error_tvt)
+
+	# print(errors_by_type)
 
 	for i, title in enumerate(['mAUC', 'BCA', 'vennorm', 'adas13', 'mmse']):
 		err_array = np.array(errors_by_type[title])
 		# print(err_array)
-		plt.plot(error['epoch'], err_array[:,0], label = 'train')
-		plt.plot(error['epoch'], err_array[:,1], label = 'valid')
-		plt.plot(error['epoch'], err_array[:,2], label = 'test')
+		plt.plot(epochs, err_array[:,0], label = 'train')
+		plt.plot(epochs, err_array[:,1], label = 'valid')
+		plt.plot(epochs, err_array[:,2], label = 'test')
 		plt.legend()
-		plt.savefig(title + '.png')
+		plt.savefig(model_name.split('/')[0] + '_' + title + '.png')
+		plt.clf()
+
 
 
 		
