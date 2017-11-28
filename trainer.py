@@ -40,7 +40,7 @@ my_model = MaskRNN(
 my_model.build_net(base_learning_rate=0.001)
 my_model.draw_nets()
 my_model.train(
-    iters=5000,
+    iters=1000,
     iters_to_report=100,
 )
 # my_model.plot_loss_trend()

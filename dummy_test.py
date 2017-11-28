@@ -18,3 +18,6 @@ import numpy as np
 a = np.array([0, 1, 0])
 b=np.argmax(a)
 print(b)
+
+a = np.linspace(100, 1000, num=10)
+print(a)

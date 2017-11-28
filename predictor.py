@@ -4,9 +4,10 @@ from caffe2.python import (
 	workspace, core
 )
 from eval import MAUC, calcBCA
+import matplotlib.pyplot as plt
 
 SEQ_LEN = 19
-HIDDEN_DIM = 256
+HIDDEN_DIM = 32
 
 def predict(model_name, seq_lens, inputs, index):
 	inputs = np.transpose(inputs, (1, 0, 2))
@@ -64,34 +65,38 @@ def compute_mAUC_BCA(class_output, class_target, class_mask, start_end_index):
 				#
 				data.append((label[0], class_output[i, k, :]))
 
-	return (MAUC(data, 3), calcBCA(estimLabels, trueLabels, 3))
+	return [MAUC(data, 3), calcBCA(estimLabels, trueLabels, 3)]
 
 
 if __name__ == '__main__':
 	data_path = './data/'
-	model_name = 'model3/MaskRNN'
-	index = 100
+	model_name = 'model4/MaskRNN'
+	index = 1000
 	tar_mean = np.load(data_path + 'tar_mean.npy').astype(np.float32)
 	tar_std = np.load(data_path + 'tar_std.npy').astype(np.float32)
-	# train
-	(train_seq_lens, train_features, 
-		train_targets, train_start_end_index) = load_data(data_path, 'train')
-	target = predict(model_name, train_seq_lens, train_features, index)
-	train_regre_target = np.multiply(train_targets[:,:,3:6], tar_std) + tar_mean
-	train_regre_output = np.multiply(target[1], tar_std) + tar_mean
-	print(compute_regre_error(train_regre_output, train_regre_target, 
-		train_targets[:,:,7:10], train_start_end_index))
-	print(compute_mAUC_BCA(target[1], train_targets[:,:,0:3], 
-		train_targets[:,:,6:7], train_start_end_index))
-	# test
-	for data_type in ['valid','test']:
-		(test_seq_lens, test_features, 
-			test_targets, test_start_end_index) = load_data(data_path, data_type)		
-		target = predict(model_name, test_seq_lens, test_features, index)
-		test_regre_target = test_targets[:,:,3:6]
-		test_regre_output = np.multiply(target[1], tar_std) + tar_mean
-		print(compute_regre_error(test_regre_output, test_regre_target, 
-			test_targets[:,:,7:10], test_start_end_index))
-		print(compute_mAUC_BCA(target[1], test_targets[:,:,0:3], 
-			test_targets[:,:,6:7], test_start_end_index))
+	error={'epoch':[],'train':[], 'valid':[], 'test':[]}
+	for index in list(np.linspace(100, 900, num=9)) + [999]
+		# tests
+		for data_type in ['train','valid','test']:
+			(test_seq_lens, test_features, 
+				test_targets, test_start_end_index) = load_data(data_path, data_type)		
+			target = predict(model_name, test_seq_lens, test_features, index)
+			if data_type == 'train':
+				test_regre_target = np.multiply(test_targets[:,:,3:6], tar_std) + tar_mean
+			else:
+				test_regre_target = test_targets[:,:,3:6]
+			test_regre_output = np.multiply(target[1], tar_std) + tar_mean
+			error['epoch'].append(index)
+			error[data_type].append(
+				compute_mAUC_BCA(target[1], test_targets[:,:,0:3], 
+				test_targets[:,:,6:7], test_start_end_index) +
+				compute_regre_error(test_regre_output, test_regre_target, 
+				test_targets[:,:,7:10], test_start_end_index)
+			)
+
+	for i, title in enumerate['mAUC', 'BCA', 'vennorm', 'adas13', 'mmse']:
+		for data_type in ['train','valid','test']:
+			i
+
+
 		
