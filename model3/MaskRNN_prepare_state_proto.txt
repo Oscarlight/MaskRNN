@@ -1,0 +1,8 @@
+name: "prepare_state"
+op {
+  input: "MaskRNN/hidden_t_last"
+  output: "hidden_init"
+  name: ""
+  type: "Copy"
+}
+external_input: "MaskRNN/hidden_t_last"

@@ -1,0 +1,2012 @@
+name: "mask_rnn_1"
+op {
+  input: "dbreader_train"
+  output: "seq_lengths"
+  output: "input_blob_batch_first"
+  output: "class_target_batch_first"
+  output: "regre_target_batch_first"
+  output: "class_target_mask_batch_first"
+  output: "regre_target_mask_batch_first"
+  name: "DBInput_train"
+  type: "TensorProtosDBInput"
+  arg {
+    name: "batch_size"
+    i: 655
+  }
+}
+op {
+  input: "seq_lengths"
+  output: "seq_lengths"
+  name: ""
+  type: "StopGradient"
+}
+op {
+  input: "input_blob_batch_first"
+  output: "input_blob_batch_first"
+  name: ""
+  type: "StopGradient"
+}
+op {
+  input: "class_target_batch_first"
+  output: "class_target_batch_first"
+  name: ""
+  type: "StopGradient"
+}
+op {
+  input: "regre_target_batch_first"
+  output: "regre_target_batch_first"
+  name: ""
+  type: "StopGradient"
+}
+op {
+  input: "class_target_mask_batch_first"
+  output: "class_target_mask_batch_first"
+  name: ""
+  type: "StopGradient"
+}
+op {
+  input: "input_blob_batch_first"
+  output: "input_blob"
+  name: ""
+  type: "Transpose"
+  arg {
+    name: "axes"
+    ints: 1
+    ints: 0
+    ints: 2
+  }
+}
+op {
+  input: "class_target_batch_first"
+  output: "class_target"
+  name: ""
+  type: "Transpose"
+  arg {
+    name: "axes"
+    ints: 1
+    ints: 0
+    ints: 2
+  }
+}
+op {
+  input: "regre_target_batch_first"
+  output: "regre_target"
+  name: ""
+  type: "Transpose"
+  arg {
+    name: "axes"
+    ints: 1
+    ints: 0
+    ints: 2
+  }
+}
+op {
+  input: "class_target_mask_batch_first"
+  output: "class_target_mask"
+  name: ""
+  type: "Transpose"
+  arg {
+    name: "axes"
+    ints: 1
+    ints: 0
+    ints: 2
+  }
+}
+op {
+  input: "regre_target_mask_batch_first"
+  output: "regre_target_mask"
+  name: ""
+  type: "Transpose"
+  arg {
+    name: "axes"
+    ints: 1
+    ints: 0
+    ints: 2
+  }
+}
+op {
+  input: "input_blob"
+  output: "MaskRNN/inputs"
+  output: "MaskRNN/inputs_last"
+  output: "MaskRNN/inputs_mean"
+  output: "MaskRNN/masks"
+  output: "MaskRNN/intervals"
+  name: ""
+  type: "Split"
+  arg {
+    name: "axis"
+    i: 2
+  }
+}
+op {
+  input: "MaskRNN/intervals"
+  input: "input_decay/MaskRNN/intervals_fc_w"
+  input: "input_decay/MaskRNN/intervals_fc_b"
+  output: "input_decay/MaskRNN/intervals_fc"
+  name: ""
+  type: "FC"
+  arg {
+    name: "use_cudnn"
+    i: 1
+  }
+  arg {
+    name: "cudnn_exhaustive_search"
+    i: 0
+  }
+  arg {
+    name: "order"
+    s: "NCHW"
+  }
+  arg {
+    name: "axis"
+    i: 2
+  }
+}
+op {
+  input: "input_decay/MaskRNN/intervals_fc"
+  output: "input_decay/MaskRNN/ZEROS"
+  name: ""
+  type: "ConstantFill"
+  arg {
+    name: "value"
+    f: 0.0
+  }
+}
+op {
+  input: "input_decay/MaskRNN/intervals_fc"
+  input: "input_decay/MaskRNN/ZEROS"
+  output: "input_decay/MaskRNN/max_intervals_fc"
+  name: ""
+  type: "Max"
+}
+op {
+  input: "input_decay/MaskRNN/max_intervals_fc"
+  output: "input_decay/MaskRNN/neg_max_interval_fc"
+  name: ""
+  type: "Negative"
+}
+op {
+  input: "input_decay/MaskRNN/neg_max_interval_fc"
+  output: "input_decay/MaskRNN/decays"
+  name: ""
+  type: "Exp"
+}
+op {
+  input: "MaskRNN/masks"
+  output: "MaskRNN/ONES"
+  name: ""
+  type: "ConstantFill"
+  arg {
+    name: "value"
+    f: 1.0
+  }
+}
+op {
+  input: "MaskRNN/ONES"
+  input: "MaskRNN/masks"
+  output: "MaskRNN/one_minus_masks"
+  name: ""
+  type: "Sub"
+}
+op {
+  input: "MaskRNN/ONES"
+  input: "input_decay/MaskRNN/decays"
+  output: "MaskRNN/one_minus_decays"
+  name: ""
+  type: "Sub"
+}
+op {
+  input: "MaskRNN/masks"
+  input: "MaskRNN/inputs"
+  output: "MaskRNN/masked_inputs_1"
+  name: ""
+  type: "Mul"
+}
+op {
+  input: "input_decay/MaskRNN/decays"
+  input: "MaskRNN/inputs_last"
+  output: "MaskRNN/decayed_inputs_last"
+  name: ""
+  type: "Mul"
+}
+op {
+  input: "MaskRNN/one_minus_masks"
+  input: "MaskRNN/decayed_inputs_last"
+  output: "MaskRNN/masked_decayed_inputs_last"
+  name: ""
+  type: "Mul"
+}
+op {
+  input: "MaskRNN/one_minus_decays"
+  input: "MaskRNN/inputs_mean"
+  output: "MaskRNN/decayed_inputs_mean"
+  name: ""
+  type: "Mul"
+}
+op {
+  input: "MaskRNN/one_minus_masks"
+  input: "MaskRNN/decayed_inputs_mean"
+  output: "MaskRNN/masked_decayed_inputs_mean"
+  name: ""
+  type: "Mul"
+}
+op {
+  input: "MaskRNN/masked_decayed_inputs_last"
+  input: "MaskRNN/masked_decayed_inputs_mean"
+  output: "MaskRNN/sum_input_last_mean"
+  name: ""
+  type: "Add"
+}
+op {
+  input: "MaskRNN/masked_inputs_1"
+  input: "MaskRNN/sum_input_last_mean"
+  output: "MaskRNN/masked_inputs"
+  name: ""
+  type: "Add"
+}
+op {
+  input: "MaskRNN/masked_inputs"
+  input: "MaskRNN/masked_inputs_hidden_w"
+  input: "MaskRNN/masked_inputs_hidden_b"
+  output: "MaskRNN/masked_inputs_hidden"
+  name: ""
+  type: "FC"
+  arg {
+    name: "use_cudnn"
+    i: 1
+  }
+  arg {
+    name: "cudnn_exhaustive_search"
+    i: 0
+  }
+  arg {
+    name: "order"
+    s: "NCHW"
+  }
+  arg {
+    name: "axis"
+    i: 2
+  }
+}
+op {
+  input: "MaskRNN/masks"
+  input: "MaskRNN/masks_hidden_w"
+  input: "MaskRNN/masks_hidden_b"
+  output: "MaskRNN/masks_hidden"
+  name: ""
+  type: "FC"
+  arg {
+    name: "use_cudnn"
+    i: 1
+  }
+  arg {
+    name: "cudnn_exhaustive_search"
+    i: 0
+  }
+  arg {
+    name: "order"
+    s: "NCHW"
+  }
+  arg {
+    name: "axis"
+    i: 2
+  }
+}
+op {
+  input: "MaskRNN/masks_hidden"
+  input: "MaskRNN/masked_inputs_hidden"
+  output: "MaskRNN/inputs_masks_blob"
+  name: ""
+  type: "Add"
+}
+op {
+  input: "MaskRNN/inputs_masks_blob"
+  input: "hidden_init"
+  input: "MaskRNN/reset_gate_t_w"
+  input: "MaskRNN/reset_gate_t_b"
+  input: "MaskRNN/update_gate_t_w"
+  input: "MaskRNN/update_gate_t_b"
+  input: "MaskRNN/output_gate_t_w"
+  input: "MaskRNN/output_gate_t_b"
+  input: "seq_lengths"
+  output: "MaskRNN/hidden_t_all"
+  output: "MaskRNN/hidden_t_last"
+  output: "MaskRNN/step_workspaces"
+  name: ""
+  type: "RecurrentNetwork"
+  arg {
+    name: "outputs_with_grads"
+    ints: 0
+  }
+  arg {
+    name: "link_internal"
+    strings: "MaskRNN/hidden_t_prev"
+    strings: "MaskRNN/hidden_t"
+    strings: "input_t"
+  }
+  arg {
+    name: "alias_dst"
+    strings: "MaskRNN/hidden_t_all"
+    strings: "MaskRNN/hidden_t_last"
+  }
+  arg {
+    name: "recompute_blobs_on_backward"
+  }
+  arg {
+    name: "timestep"
+    s: "timestep"
+  }
+  arg {
+    name: "backward_link_external"
+    strings: "MaskRNN/MaskRNN/hidden_t_prev_states_grad"
+    strings: "MaskRNN/MaskRNN/hidden_t_prev_states_grad"
+    strings: "MaskRNN/inputs_masks_blob_grad"
+  }
+  arg {
+    name: "link_external"
+    strings: "MaskRNN/MaskRNN/hidden_t_prev_states"
+    strings: "MaskRNN/MaskRNN/hidden_t_prev_states"
+    strings: "MaskRNN/inputs_masks_blob"
+  }
+  arg {
+    name: "link_offset"
+    ints: 0
+    ints: 1
+    ints: 0
+  }
+  arg {
+    name: "alias_offset"
+    ints: 1
+    ints: -1
+  }
+  arg {
+    name: "recurrent_states"
+    strings: "MaskRNN/MaskRNN/hidden_t_prev_states"
+  }
+  arg {
+    name: "backward_link_offset"
+    ints: 1
+    ints: 0
+    ints: 0
+  }
+  arg {
+    name: "param_grads"
+    strings: "MaskRNN/reset_gate_t_w_grad"
+    strings: "MaskRNN/reset_gate_t_b_grad"
+    strings: "MaskRNN/update_gate_t_w_grad"
+    strings: "MaskRNN/update_gate_t_b_grad"
+    strings: "MaskRNN/output_gate_t_w_grad"
+    strings: "MaskRNN/output_gate_t_b_grad"
+  }
+  arg {
+    name: "backward_link_internal"
+    strings: "MaskRNN/hidden_t_grad"
+    strings: "MaskRNN/hidden_t_prev_grad"
+    strings: "input_t_grad"
+  }
+  arg {
+    name: "param"
+    ints: 2
+    ints: 3
+    ints: 4
+    ints: 5
+    ints: 6
+    ints: 7
+  }
+  arg {
+    name: "step_net"
+    s: "name: \"MaskRNN\"\nop {\n  input: \"input_t\"\n  output: \"MaskRNN/input_t_reset\"\n  output: \"MaskRNN/input_t_update\"\n  output: \"MaskRNN/input_t_output\"\n  name: \"\"\n  type: \"Split\"\n  arg {\n    name: \"axis\"\n    i: 2\n  }\n}\nop {\n  input: \"MaskRNN/hidden_t_prev\"\n  input: \"MaskRNN/reset_gate_t_w\"\n  input: \"MaskRNN/reset_gate_t_b\"\n  output: \"MaskRNN/reset_gate_t\"\n  name: \"\"\n  type: \"FC\"\n  arg {\n    name: \"use_cudnn\"\n    i: 1\n  }\n  arg {\n    name: \"cudnn_exhaustive_search\"\n    i: 0\n  }\n  arg {\n    name: \"order\"\n    s: \"NCHW\"\n  }\n  arg {\n    name: \"axis\"\n    i: 2\n  }\n}\nop {\n  input: \"MaskRNN/hidden_t_prev\"\n  input: \"MaskRNN/update_gate_t_w\"\n  input: \"MaskRNN/update_gate_t_b\"\n  output: \"MaskRNN/update_gate_t\"\n  name: \"\"\n  type: \"FC\"\n  arg {\n    name: \"use_cudnn\"\n    i: 1\n  }\n  arg {\n    name: \"cudnn_exhaustive_search\"\n    i: 0\n  }\n  arg {\n    name: \"order\"\n    s: \"NCHW\"\n  }\n  arg {\n    name: \"axis\"\n    i: 2\n  }\n}\nop {\n  input: \"MaskRNN/reset_gate_t\"\n  input: \"MaskRNN/input_t_reset\"\n  output: \"MaskRNN/reset_gate_t\"\n  name: \"\"\n  type: \"Sum\"\n}\nop {\n  input: \"MaskRNN/reset_gate_t\"\n  output: \"MaskRNN/reset_gate_t_sigmoid\"\n  name: \"\"\n  type: \"Sigmoid\"\n}\nop {\n  input: \"MaskRNN/reset_gate_t_sigmoid\"\n  input: \"MaskRNN/hidden_t_prev\"\n  output: \"MaskRNN/modified_hidden_t_prev\"\n  name: \"\"\n  type: \"Mul\"\n}\nop {\n  input: \"MaskRNN/modified_hidden_t_prev\"\n  input: \"MaskRNN/output_gate_t_w\"\n  input: \"MaskRNN/output_gate_t_b\"\n  output: \"MaskRNN/output_gate_t\"\n  name: \"\"\n  type: \"FC\"\n  arg {\n    name: \"use_cudnn\"\n    i: 1\n  }\n  arg {\n    name: \"cudnn_exhaustive_search\"\n    i: 0\n  }\n  arg {\n    name: \"order\"\n    s: \"NCHW\"\n  }\n  arg {\n    name: \"axis\"\n    i: 2\n  }\n}\nop {\n  input: \"MaskRNN/update_gate_t\"\n  input: \"MaskRNN/input_t_update\"\n  output: \"MaskRNN/update_gate_t\"\n  name: \"\"\n  type: \"Sum\"\n}\nop {\n  input: \"MaskRNN/output_gate_t\"\n  input: \"MaskRNN/input_t_output\"\n  output: \"MaskRNN/output_gate_t\"\n  name: \"\"\n  type: \"Sum\"\n}\nop {\n  input: \"MaskRNN/reset_gate_t\"\n  input: \"MaskRNN/update_gate_t\"\n  input: \"MaskRNN/output_gate_t\"\n  output: \"MaskRNN/gates_t\"\n  output: \"MaskRNN/_gates_t_concat_dims\"\n  name: \"\"\n  type: \"Concat\"\n  arg {\n    name: \"axis\"\n    i: 2\n  }\n}\nop {\n  input: \"MaskRNN/hidden_t_prev\"\n  input: \"MaskRNN/gates_t\"\n  input: \"seq_lengths\"\n  input: \"timestep\"\n  output: \"MaskRNN/hidden_t\"\n  name: \"\"\n  type: \"GRUUnit\"\n  arg {\n    name: \"drop_states\"\n    i: 0\n  }\n  arg {\n    name: \"forget_bias\"\n    f: 0.0\n  }\n}\ntype: \"rnn\"\nexternal_input: \"input_t\"\nexternal_input: \"timestep\"\nexternal_input: \"MaskRNN/hidden_t_prev\"\nexternal_input: \"MaskRNN/reset_gate_t_w\"\nexternal_input: \"MaskRNN/reset_gate_t_b\"\nexternal_input: \"MaskRNN/update_gate_t_w\"\nexternal_input: \"MaskRNN/update_gate_t_b\"\nexternal_input: \"MaskRNN/output_gate_t_w\"\nexternal_input: \"MaskRNN/output_gate_t_b\"\nexternal_input: \"seq_lengths\"\nexternal_output: \"MaskRNN/hidden_t\"\n"
+  }
+  arg {
+    name: "backward_step_net_"
+    s: "name: \"RecurrentBackwardStep\"\nop {\n  input: \"MaskRNN/hidden_t_prev\"\n  input: \"MaskRNN/gates_t\"\n  input: \"seq_lengths\"\n  input: \"timestep\"\n  input: \"MaskRNN/hidden_t\"\n  input: \"MaskRNN/hidden_t_grad\"\n  output: \"MaskRNN/hidden_t_prev_grad\"\n  output: \"MaskRNN/gates_t_grad\"\n  name: \"\"\n  type: \"GRUUnitGradient\"\n  arg {\n    name: \"drop_states\"\n    i: 0\n  }\n  arg {\n    name: \"forget_bias\"\n    f: 0.0\n  }\n  is_gradient_op: true\n}\nop {\n  input: \"MaskRNN/gates_t_grad\"\n  input: \"MaskRNN/_gates_t_concat_dims\"\n  output: \"MaskRNN/reset_gate_t_grad\"\n  output: \"MaskRNN/update_gate_t_grad\"\n  output: \"MaskRNN/output_gate_t_grad\"\n  name: \"\"\n  type: \"Split\"\n  arg {\n    name: \"axis\"\n    i: 2\n  }\n  is_gradient_op: true\n}\nop {\n  input: \"MaskRNN/modified_hidden_t_prev\"\n  input: \"MaskRNN/output_gate_t_w\"\n  input: \"MaskRNN/output_gate_t_grad\"\n  output: \"MaskRNN/output_gate_t_w_grad\"\n  output: \"MaskRNN/output_gate_t_b_grad\"\n  output: \"MaskRNN/modified_hidden_t_prev_grad\"\n  name: \"\"\n  type: \"FCGradient\"\n  arg {\n    name: \"use_cudnn\"\n    i: 1\n  }\n  arg {\n    name: \"cudnn_exhaustive_search\"\n    i: 0\n  }\n  arg {\n    name: \"order\"\n    s: \"NCHW\"\n  }\n  arg {\n    name: \"axis\"\n    i: 2\n  }\n  is_gradient_op: true\n}\nop {\n  input: \"MaskRNN/modified_hidden_t_prev_grad\"\n  input: \"MaskRNN/hidden_t_prev\"\n  output: \"MaskRNN/reset_gate_t_sigmoid_grad\"\n  name: \"\"\n  type: \"Mul\"\n  is_gradient_op: true\n}\nop {\n  input: \"MaskRNN/modified_hidden_t_prev_grad\"\n  input: \"MaskRNN/reset_gate_t_sigmoid\"\n  output: \"_MaskRNN/hidden_t_prev_grad_autosplit_0\"\n  name: \"\"\n  type: \"Mul\"\n  is_gradient_op: true\n}\nop {\n  input: \"MaskRNN/reset_gate_t_sigmoid\"\n  input: \"MaskRNN/reset_gate_t_sigmoid_grad\"\n  output: \"_MaskRNN/reset_gate_t_grad_autosplit_0\"\n  name: \"\"\n  type: \"SigmoidGradient\"\n  is_gradient_op: true\n}\nop {\n  input: \"MaskRNN/reset_gate_t_grad\"\n  input: \"_MaskRNN/reset_gate_t_grad_autosplit_0\"\n  output: \"MaskRNN/reset_gate_t_grad\"\n  name: \"\"\n  type: \"Sum\"\n}\nop {\n  input: \"MaskRNN/hidden_t_prev\"\n  input: \"MaskRNN/update_gate_t_w\"\n  input: \"MaskRNN/update_gate_t_grad\"\n  output: \"MaskRNN/update_gate_t_w_grad\"\n  output: \"MaskRNN/update_gate_t_b_grad\"\n  output: \"_MaskRNN/hidden_t_prev_grad_autosplit_1\"\n  name: \"\"\n  type: \"FCGradient\"\n  arg {\n    name: \"use_cudnn\"\n    i: 1\n  }\n  arg {\n    name: \"cudnn_exhaustive_search\"\n    i: 0\n  }\n  arg {\n    name: \"order\"\n    s: \"NCHW\"\n  }\n  arg {\n    name: \"axis\"\n    i: 2\n  }\n  is_gradient_op: true\n}\nop {\n  input: \"MaskRNN/hidden_t_prev\"\n  input: \"MaskRNN/reset_gate_t_w\"\n  input: \"MaskRNN/reset_gate_t_grad\"\n  output: \"MaskRNN/reset_gate_t_w_grad\"\n  output: \"MaskRNN/reset_gate_t_b_grad\"\n  output: \"_MaskRNN/hidden_t_prev_grad_autosplit_2\"\n  name: \"\"\n  type: \"FCGradient\"\n  arg {\n    name: \"use_cudnn\"\n    i: 1\n  }\n  arg {\n    name: \"cudnn_exhaustive_search\"\n    i: 0\n  }\n  arg {\n    name: \"order\"\n    s: \"NCHW\"\n  }\n  arg {\n    name: \"axis\"\n    i: 2\n  }\n  is_gradient_op: true\n}\nop {\n  input: \"MaskRNN/hidden_t_prev_grad\"\n  input: \"_MaskRNN/hidden_t_prev_grad_autosplit_0\"\n  input: \"_MaskRNN/hidden_t_prev_grad_autosplit_1\"\n  input: \"_MaskRNN/hidden_t_prev_grad_autosplit_2\"\n  output: \"MaskRNN/hidden_t_prev_grad\"\n  name: \"\"\n  type: \"Sum\"\n}\nop {\n  input: \"MaskRNN/reset_gate_t_grad\"\n  input: \"MaskRNN/update_gate_t_grad\"\n  input: \"MaskRNN/output_gate_t_grad\"\n  output: \"input_t_grad\"\n  output: \"_input_t_grad_dims\"\n  name: \"\"\n  type: \"Concat\"\n  arg {\n    name: \"axis\"\n    i: 2\n  }\n  is_gradient_op: true\n}\ntype: \"simple\"\nexternal_input: \"MaskRNN/_gates_t_concat_dims\"\nexternal_input: \"MaskRNN/reset_gate_t_sigmoid\"\nexternal_input: \"MaskRNN/modified_hidden_t_prev\"\nexternal_input: \"MaskRNN/gates_t\"\nexternal_input: \"MaskRNN/hidden_t_grad\"\nexternal_input: \"input_t\"\nexternal_input: \"timestep\"\nexternal_input: \"MaskRNN/hidden_t_prev\"\nexternal_input: \"MaskRNN/reset_gate_t_w\"\nexternal_input: \"MaskRNN/reset_gate_t_b\"\nexternal_input: \"MaskRNN/update_gate_t_w\"\nexternal_input: \"MaskRNN/update_gate_t_b\"\nexternal_input: \"MaskRNN/output_gate_t_w\"\nexternal_input: \"MaskRNN/output_gate_t_b\"\nexternal_input: \"seq_lengths\"\nexternal_input: \"MaskRNN/hidden_t\"\n"
+  }
+  arg {
+    name: "alias_src"
+    strings: "MaskRNN/MaskRNN/hidden_t_prev_states"
+    strings: "MaskRNN/MaskRNN/hidden_t_prev_states"
+  }
+  arg {
+    name: "initial_recurrent_state_ids"
+    ints: 1
+  }
+}
+op {
+  input: "MaskRNN/hidden_t_all"
+  input: "mask_rnn_blob_0_w"
+  input: "mask_rnn_blob_0_b"
+  output: "mask_rnn_blob_0"
+  name: ""
+  type: "FC"
+  arg {
+    name: "use_cudnn"
+    i: 1
+  }
+  arg {
+    name: "cudnn_exhaustive_search"
+    i: 0
+  }
+  arg {
+    name: "order"
+    s: "NCHW"
+  }
+  arg {
+    name: "axis"
+    i: 2
+  }
+}
+op {
+  input: "MaskRNN/hidden_t_all"
+  input: "mask_rnn_blob_1_w"
+  input: "mask_rnn_blob_1_b"
+  output: "mask_rnn_blob_1"
+  name: ""
+  type: "FC"
+  arg {
+    name: "use_cudnn"
+    i: 1
+  }
+  arg {
+    name: "cudnn_exhaustive_search"
+    i: 0
+  }
+  arg {
+    name: "order"
+    s: "NCHW"
+  }
+  arg {
+    name: "axis"
+    i: 2
+  }
+}
+op {
+  input: "mask_rnn_blob_1"
+  output: "class_softmax_output"
+  name: ""
+  type: "Softmax"
+  arg {
+    name: "axis"
+    i: 2
+  }
+}
+op {
+  input: "mask_rnn_blob_0"
+  output: "regre_output_reshaped"
+  output: "_regre_output_shape"
+  name: ""
+  type: "Reshape"
+  arg {
+    name: "shape"
+    ints: -1
+    ints: 3
+  }
+}
+op {
+  input: "regre_target"
+  output: "regre_target_reshaped"
+  output: "_regre_target_shape"
+  name: ""
+  type: "Reshape"
+  arg {
+    name: "shape"
+    ints: -1
+    ints: 3
+  }
+}
+op {
+  input: "class_target_mask"
+  output: "class_target_mask_reshaped"
+  output: "_class_target_mask_shape"
+  name: ""
+  type: "Reshape"
+  arg {
+    name: "shape"
+    ints: -1
+    ints: 1
+  }
+}
+op {
+  input: "regre_target_mask"
+  output: "regre_target_mask_reshaped"
+  output: "_regre_target_mask_shape"
+  name: ""
+  type: "Reshape"
+  arg {
+    name: "shape"
+    ints: -1
+    ints: 3
+  }
+}
+op {
+  input: "regre_target_reshaped"
+  output: "stopped_regre_target_reshaped"
+  name: ""
+  type: "StopGradient"
+}
+op {
+  input: "class_target_mask_reshaped"
+  output: "stopped_class_target_mask_reshaped"
+  name: ""
+  type: "StopGradient"
+}
+op {
+  input: "regre_target_mask_reshaped"
+  output: "stopped_regre_target_mask_reshaped"
+  name: ""
+  type: "StopGradient"
+}
+op {
+  input: "stopped_class_target_mask_reshaped"
+  output: "squeezed_class_target_mask"
+  name: ""
+  type: "Squeeze"
+  arg {
+    name: "dims"
+    ints: 1
+  }
+}
+op {
+  input: "class_target"
+  output: "stopped_class_target"
+  name: ""
+  type: "StopGradient"
+}
+op {
+  input: "class_softmax_output"
+  input: "stopped_class_target"
+  output: "correct_class"
+  name: ""
+  type: "Mul"
+}
+op {
+  input: "correct_class"
+  output: "correct_class_reduced"
+  name: ""
+  type: "ReduceBackSum"
+}
+op {
+  input: "correct_class_reduced"
+  output: "class_target_reshaped"
+  output: "_class_target_shape"
+  name: ""
+  type: "Reshape"
+  arg {
+    name: "shape"
+    ints: -1
+  }
+}
+op {
+  input: "class_target_reshaped"
+  output: "log_correct_class_reshaped"
+  name: ""
+  type: "Log"
+}
+op {
+  input: "log_correct_class_reshaped"
+  output: "neglog_correct_class_reshaped"
+  name: ""
+  type: "Negative"
+}
+op {
+  input: "neglog_correct_class_reshaped"
+  input: "squeezed_class_target_mask"
+  output: "masked_correct_class_reshaped"
+  name: ""
+  type: "Mul"
+}
+op {
+  input: "masked_correct_class_reshaped"
+  output: "class_average_loss"
+  name: ""
+  type: "AveragedLoss"
+}
+op {
+  input: "regre_output_reshaped"
+  output: "regre_output_reshaped_0"
+  output: "regre_output_reshaped_1"
+  output: "regre_output_reshaped_2"
+  name: ""
+  type: "Split"
+  arg {
+    name: "axis"
+    i: 1
+  }
+}
+op {
+  input: "stopped_regre_target_reshaped"
+  output: "regre_target_reshaped_0"
+  output: "regre_target_reshaped_1"
+  output: "regre_target_reshaped_2"
+  name: ""
+  type: "Split"
+  arg {
+    name: "axis"
+    i: 1
+  }
+}
+op {
+  input: "stopped_regre_target_mask_reshaped"
+  output: "regre_target_mask_reshaped_0"
+  output: "regre_target_mask_reshaped_1"
+  output: "regre_target_mask_reshaped_2"
+  name: ""
+  type: "Split"
+  arg {
+    name: "axis"
+    i: 1
+  }
+}
+op {
+  input: "regre_output_reshaped_0"
+  input: "regre_target_reshaped_0"
+  output: "l2_dist_0"
+  name: ""
+  type: "SquaredL2Distance"
+}
+op {
+  input: "regre_target_mask_reshaped_0"
+  output: "squeezed_regre_target_mask_0"
+  name: ""
+  type: "Squeeze"
+  arg {
+    name: "dims"
+    ints: 1
+  }
+}
+op {
+  input: "squeezed_regre_target_mask_0"
+  input: "l2_dist_0"
+  output: "masked_l2_dist_0"
+  name: ""
+  type: "Mul"
+}
+op {
+  input: "masked_l2_dist_0"
+  output: "regre_average_loss_0"
+  name: ""
+  type: "AveragedLoss"
+}
+op {
+  input: "regre_output_reshaped_1"
+  input: "regre_target_reshaped_1"
+  output: "l2_dist_1"
+  name: ""
+  type: "SquaredL2Distance"
+}
+op {
+  input: "regre_target_mask_reshaped_1"
+  output: "squeezed_regre_target_mask_1"
+  name: ""
+  type: "Squeeze"
+  arg {
+    name: "dims"
+    ints: 1
+  }
+}
+op {
+  input: "squeezed_regre_target_mask_1"
+  input: "l2_dist_1"
+  output: "masked_l2_dist_1"
+  name: ""
+  type: "Mul"
+}
+op {
+  input: "masked_l2_dist_1"
+  output: "regre_average_loss_1"
+  name: ""
+  type: "AveragedLoss"
+}
+op {
+  input: "regre_output_reshaped_2"
+  input: "regre_target_reshaped_2"
+  output: "l2_dist_2"
+  name: ""
+  type: "SquaredL2Distance"
+}
+op {
+  input: "regre_target_mask_reshaped_2"
+  output: "squeezed_regre_target_mask_2"
+  name: ""
+  type: "Squeeze"
+  arg {
+    name: "dims"
+    ints: 1
+  }
+}
+op {
+  input: "squeezed_regre_target_mask_2"
+  input: "l2_dist_2"
+  output: "masked_l2_dist_2"
+  name: ""
+  type: "Mul"
+}
+op {
+  input: "masked_l2_dist_2"
+  output: "regre_average_loss_2"
+  name: ""
+  type: "AveragedLoss"
+}
+op {
+  input: "regre_average_loss_0"
+  output: "regre_average_loss_0_autogen_grad"
+  name: ""
+  type: "ConstantFill"
+  arg {
+    name: "value"
+    f: 1.0
+  }
+}
+op {
+  input: "class_average_loss"
+  output: "class_average_loss_autogen_grad"
+  name: ""
+  type: "ConstantFill"
+  arg {
+    name: "value"
+    f: 1.0
+  }
+}
+op {
+  input: "regre_average_loss_1"
+  output: "regre_average_loss_1_autogen_grad"
+  name: ""
+  type: "ConstantFill"
+  arg {
+    name: "value"
+    f: 1.0
+  }
+}
+op {
+  input: "regre_average_loss_2"
+  output: "regre_average_loss_2_autogen_grad"
+  name: ""
+  type: "ConstantFill"
+  arg {
+    name: "value"
+    f: 1.0
+  }
+}
+op {
+  input: "masked_l2_dist_2"
+  input: "regre_average_loss_2_autogen_grad"
+  output: "masked_l2_dist_2_grad"
+  name: ""
+  type: "AveragedLossGradient"
+  is_gradient_op: true
+}
+op {
+  input: "masked_l2_dist_2_grad"
+  input: "l2_dist_2"
+  output: "squeezed_regre_target_mask_2_grad"
+  name: ""
+  type: "Mul"
+  is_gradient_op: true
+}
+op {
+  input: "masked_l2_dist_2_grad"
+  input: "squeezed_regre_target_mask_2"
+  output: "l2_dist_2_grad"
+  name: ""
+  type: "Mul"
+  is_gradient_op: true
+}
+op {
+  input: "squeezed_regre_target_mask_2_grad"
+  output: "regre_target_mask_reshaped_2_grad"
+  name: ""
+  type: "ExpandDims"
+  arg {
+    name: "dims"
+    ints: 1
+  }
+  is_gradient_op: true
+}
+op {
+  input: "regre_output_reshaped_2"
+  input: "regre_target_reshaped_2"
+  input: "l2_dist_2_grad"
+  output: "regre_output_reshaped_2_grad"
+  output: "regre_target_reshaped_2_grad"
+  name: ""
+  type: "SquaredL2DistanceGradient"
+  is_gradient_op: true
+}
+op {
+  input: "masked_l2_dist_1"
+  input: "regre_average_loss_1_autogen_grad"
+  output: "masked_l2_dist_1_grad"
+  name: ""
+  type: "AveragedLossGradient"
+  is_gradient_op: true
+}
+op {
+  input: "masked_l2_dist_1_grad"
+  input: "l2_dist_1"
+  output: "squeezed_regre_target_mask_1_grad"
+  name: ""
+  type: "Mul"
+  is_gradient_op: true
+}
+op {
+  input: "masked_l2_dist_1_grad"
+  input: "squeezed_regre_target_mask_1"
+  output: "l2_dist_1_grad"
+  name: ""
+  type: "Mul"
+  is_gradient_op: true
+}
+op {
+  input: "squeezed_regre_target_mask_1_grad"
+  output: "regre_target_mask_reshaped_1_grad"
+  name: ""
+  type: "ExpandDims"
+  arg {
+    name: "dims"
+    ints: 1
+  }
+  is_gradient_op: true
+}
+op {
+  input: "regre_output_reshaped_1"
+  input: "regre_target_reshaped_1"
+  input: "l2_dist_1_grad"
+  output: "regre_output_reshaped_1_grad"
+  output: "regre_target_reshaped_1_grad"
+  name: ""
+  type: "SquaredL2DistanceGradient"
+  is_gradient_op: true
+}
+op {
+  input: "masked_l2_dist_0"
+  input: "regre_average_loss_0_autogen_grad"
+  output: "masked_l2_dist_0_grad"
+  name: ""
+  type: "AveragedLossGradient"
+  is_gradient_op: true
+}
+op {
+  input: "masked_l2_dist_0_grad"
+  input: "l2_dist_0"
+  output: "squeezed_regre_target_mask_0_grad"
+  name: ""
+  type: "Mul"
+  is_gradient_op: true
+}
+op {
+  input: "masked_l2_dist_0_grad"
+  input: "squeezed_regre_target_mask_0"
+  output: "l2_dist_0_grad"
+  name: ""
+  type: "Mul"
+  is_gradient_op: true
+}
+op {
+  input: "squeezed_regre_target_mask_0_grad"
+  output: "regre_target_mask_reshaped_0_grad"
+  name: ""
+  type: "ExpandDims"
+  arg {
+    name: "dims"
+    ints: 1
+  }
+  is_gradient_op: true
+}
+op {
+  input: "regre_output_reshaped_0"
+  input: "regre_target_reshaped_0"
+  input: "l2_dist_0_grad"
+  output: "regre_output_reshaped_0_grad"
+  output: "regre_target_reshaped_0_grad"
+  name: ""
+  type: "SquaredL2DistanceGradient"
+  is_gradient_op: true
+}
+op {
+  input: "regre_target_mask_reshaped_0_grad"
+  input: "regre_target_mask_reshaped_1_grad"
+  input: "regre_target_mask_reshaped_2_grad"
+  output: "stopped_regre_target_mask_reshaped_grad"
+  output: "_stopped_regre_target_mask_reshaped_grad_dims"
+  name: ""
+  type: "Concat"
+  arg {
+    name: "axis"
+    i: 1
+  }
+  is_gradient_op: true
+}
+op {
+  input: "regre_target_reshaped_0_grad"
+  input: "regre_target_reshaped_1_grad"
+  input: "regre_target_reshaped_2_grad"
+  output: "stopped_regre_target_reshaped_grad"
+  output: "_stopped_regre_target_reshaped_grad_dims"
+  name: ""
+  type: "Concat"
+  arg {
+    name: "axis"
+    i: 1
+  }
+  is_gradient_op: true
+}
+op {
+  input: "regre_output_reshaped_0_grad"
+  input: "regre_output_reshaped_1_grad"
+  input: "regre_output_reshaped_2_grad"
+  output: "regre_output_reshaped_grad"
+  output: "_regre_output_reshaped_grad_dims"
+  name: ""
+  type: "Concat"
+  arg {
+    name: "axis"
+    i: 1
+  }
+  is_gradient_op: true
+}
+op {
+  input: "masked_correct_class_reshaped"
+  input: "class_average_loss_autogen_grad"
+  output: "masked_correct_class_reshaped_grad"
+  name: ""
+  type: "AveragedLossGradient"
+  is_gradient_op: true
+}
+op {
+  input: "masked_correct_class_reshaped_grad"
+  input: "squeezed_class_target_mask"
+  output: "neglog_correct_class_reshaped_grad"
+  name: ""
+  type: "Mul"
+  is_gradient_op: true
+}
+op {
+  input: "masked_correct_class_reshaped_grad"
+  input: "neglog_correct_class_reshaped"
+  output: "squeezed_class_target_mask_grad"
+  name: ""
+  type: "Mul"
+  is_gradient_op: true
+}
+op {
+  input: "neglog_correct_class_reshaped_grad"
+  output: "log_correct_class_reshaped_grad"
+  name: ""
+  type: "Negative"
+  is_gradient_op: true
+}
+op {
+  input: "log_correct_class_reshaped_grad"
+  input: "class_target_reshaped"
+  output: "class_target_reshaped_grad"
+  name: ""
+  type: "Div"
+  is_gradient_op: true
+}
+op {
+  input: "class_target_reshaped_grad"
+  input: "_class_target_shape"
+  output: "correct_class_reduced_grad"
+  output: "_correct_class_reduced_grad_dims"
+  name: ""
+  type: "Reshape"
+  is_gradient_op: true
+}
+op {
+  input: "correct_class"
+  output: "_correct_class_reduced_dims"
+  name: ""
+  type: "Shape"
+  is_gradient_op: true
+}
+op {
+  input: "correct_class_reduced_grad"
+  input: "_correct_class_reduced_dims"
+  output: "correct_class_grad"
+  name: ""
+  type: "ReduceBackSumGradient"
+  is_gradient_op: true
+}
+op {
+  input: "correct_class_grad"
+  input: "stopped_class_target"
+  output: "class_softmax_output_grad"
+  name: ""
+  type: "Mul"
+  is_gradient_op: true
+}
+op {
+  input: "correct_class_grad"
+  input: "class_softmax_output"
+  output: "stopped_class_target_grad"
+  name: ""
+  type: "Mul"
+  is_gradient_op: true
+}
+op {
+  input: "squeezed_class_target_mask_grad"
+  output: "stopped_class_target_mask_reshaped_grad"
+  name: ""
+  type: "ExpandDims"
+  arg {
+    name: "dims"
+    ints: 1
+  }
+  is_gradient_op: true
+}
+op {
+  input: "regre_output_reshaped_grad"
+  input: "_regre_output_shape"
+  output: "mask_rnn_blob_0_grad"
+  output: "_mask_rnn_blob_0_grad_dims"
+  name: ""
+  type: "Reshape"
+  is_gradient_op: true
+}
+op {
+  input: "class_softmax_output"
+  input: "class_softmax_output_grad"
+  output: "mask_rnn_blob_1_grad"
+  name: ""
+  type: "SoftmaxGradient"
+  arg {
+    name: "axis"
+    i: 2
+  }
+  is_gradient_op: true
+}
+op {
+  input: "MaskRNN/hidden_t_all"
+  input: "mask_rnn_blob_1_w"
+  input: "mask_rnn_blob_1_grad"
+  output: "mask_rnn_blob_1_w_grad"
+  output: "mask_rnn_blob_1_b_grad"
+  output: "MaskRNN/hidden_t_all_grad"
+  name: ""
+  type: "FCGradient"
+  arg {
+    name: "use_cudnn"
+    i: 1
+  }
+  arg {
+    name: "cudnn_exhaustive_search"
+    i: 0
+  }
+  arg {
+    name: "order"
+    s: "NCHW"
+  }
+  arg {
+    name: "axis"
+    i: 2
+  }
+  is_gradient_op: true
+}
+op {
+  input: "MaskRNN/hidden_t_all"
+  input: "mask_rnn_blob_0_w"
+  input: "mask_rnn_blob_0_grad"
+  output: "mask_rnn_blob_0_w_grad"
+  output: "mask_rnn_blob_0_b_grad"
+  output: "_MaskRNN/hidden_t_all_grad_autosplit_0"
+  name: ""
+  type: "FCGradient"
+  arg {
+    name: "use_cudnn"
+    i: 1
+  }
+  arg {
+    name: "cudnn_exhaustive_search"
+    i: 0
+  }
+  arg {
+    name: "order"
+    s: "NCHW"
+  }
+  arg {
+    name: "axis"
+    i: 2
+  }
+  is_gradient_op: true
+}
+op {
+  input: "MaskRNN/hidden_t_all_grad"
+  input: "_MaskRNN/hidden_t_all_grad_autosplit_0"
+  output: "MaskRNN/hidden_t_all_grad"
+  name: ""
+  type: "Sum"
+}
+op {
+  input: "MaskRNN/hidden_t_all_grad"
+  input: "MaskRNN/inputs_masks_blob"
+  input: "hidden_init"
+  input: "MaskRNN/reset_gate_t_w"
+  input: "MaskRNN/reset_gate_t_b"
+  input: "MaskRNN/update_gate_t_w"
+  input: "MaskRNN/update_gate_t_b"
+  input: "MaskRNN/output_gate_t_w"
+  input: "MaskRNN/output_gate_t_b"
+  input: "seq_lengths"
+  input: "MaskRNN/hidden_t_all"
+  input: "MaskRNN/hidden_t_last"
+  input: "MaskRNN/step_workspaces"
+  output: "MaskRNN/inputs_masks_blob_grad"
+  output: "MaskRNN/reset_gate_t_w_grad"
+  output: "MaskRNN/reset_gate_t_b_grad"
+  output: "MaskRNN/update_gate_t_w_grad"
+  output: "MaskRNN/update_gate_t_b_grad"
+  output: "MaskRNN/output_gate_t_w_grad"
+  output: "MaskRNN/output_gate_t_b_grad"
+  output: "hidden_init_grad"
+  name: ""
+  type: "RecurrentNetworkGradient"
+  arg {
+    name: "outputs_with_grads"
+    ints: 0
+  }
+  arg {
+    name: "link_internal"
+    strings: "MaskRNN/hidden_t_prev"
+    strings: "MaskRNN/hidden_t"
+    strings: "input_t"
+  }
+  arg {
+    name: "alias_dst"
+    strings: "MaskRNN/hidden_t_all"
+    strings: "MaskRNN/hidden_t_last"
+  }
+  arg {
+    name: "recompute_blobs_on_backward"
+  }
+  arg {
+    name: "timestep"
+    s: "timestep"
+  }
+  arg {
+    name: "backward_link_external"
+    strings: "MaskRNN/MaskRNN/hidden_t_prev_states_grad"
+    strings: "MaskRNN/MaskRNN/hidden_t_prev_states_grad"
+    strings: "MaskRNN/inputs_masks_blob_grad"
+  }
+  arg {
+    name: "link_external"
+    strings: "MaskRNN/MaskRNN/hidden_t_prev_states"
+    strings: "MaskRNN/MaskRNN/hidden_t_prev_states"
+    strings: "MaskRNN/inputs_masks_blob"
+  }
+  arg {
+    name: "link_offset"
+    ints: 0
+    ints: 1
+    ints: 0
+  }
+  arg {
+    name: "alias_offset"
+    ints: 1
+    ints: -1
+  }
+  arg {
+    name: "recurrent_states"
+    strings: "MaskRNN/MaskRNN/hidden_t_prev_states"
+  }
+  arg {
+    name: "backward_link_offset"
+    ints: 1
+    ints: 0
+    ints: 0
+  }
+  arg {
+    name: "param_grads"
+    strings: "MaskRNN/reset_gate_t_w_grad"
+    strings: "MaskRNN/reset_gate_t_b_grad"
+    strings: "MaskRNN/update_gate_t_w_grad"
+    strings: "MaskRNN/update_gate_t_b_grad"
+    strings: "MaskRNN/output_gate_t_w_grad"
+    strings: "MaskRNN/output_gate_t_b_grad"
+  }
+  arg {
+    name: "backward_link_internal"
+    strings: "MaskRNN/hidden_t_grad"
+    strings: "MaskRNN/hidden_t_prev_grad"
+    strings: "input_t_grad"
+  }
+  arg {
+    name: "param"
+    ints: 2
+    ints: 3
+    ints: 4
+    ints: 5
+    ints: 6
+    ints: 7
+  }
+  arg {
+    name: "step_net"
+    s: "name: \"MaskRNN\"\nop {\n  input: \"input_t\"\n  output: \"MaskRNN/input_t_reset\"\n  output: \"MaskRNN/input_t_update\"\n  output: \"MaskRNN/input_t_output\"\n  name: \"\"\n  type: \"Split\"\n  arg {\n    name: \"axis\"\n    i: 2\n  }\n}\nop {\n  input: \"MaskRNN/hidden_t_prev\"\n  input: \"MaskRNN/reset_gate_t_w\"\n  input: \"MaskRNN/reset_gate_t_b\"\n  output: \"MaskRNN/reset_gate_t\"\n  name: \"\"\n  type: \"FC\"\n  arg {\n    name: \"use_cudnn\"\n    i: 1\n  }\n  arg {\n    name: \"cudnn_exhaustive_search\"\n    i: 0\n  }\n  arg {\n    name: \"order\"\n    s: \"NCHW\"\n  }\n  arg {\n    name: \"axis\"\n    i: 2\n  }\n}\nop {\n  input: \"MaskRNN/hidden_t_prev\"\n  input: \"MaskRNN/update_gate_t_w\"\n  input: \"MaskRNN/update_gate_t_b\"\n  output: \"MaskRNN/update_gate_t\"\n  name: \"\"\n  type: \"FC\"\n  arg {\n    name: \"use_cudnn\"\n    i: 1\n  }\n  arg {\n    name: \"cudnn_exhaustive_search\"\n    i: 0\n  }\n  arg {\n    name: \"order\"\n    s: \"NCHW\"\n  }\n  arg {\n    name: \"axis\"\n    i: 2\n  }\n}\nop {\n  input: \"MaskRNN/reset_gate_t\"\n  input: \"MaskRNN/input_t_reset\"\n  output: \"MaskRNN/reset_gate_t\"\n  name: \"\"\n  type: \"Sum\"\n}\nop {\n  input: \"MaskRNN/reset_gate_t\"\n  output: \"MaskRNN/reset_gate_t_sigmoid\"\n  name: \"\"\n  type: \"Sigmoid\"\n}\nop {\n  input: \"MaskRNN/reset_gate_t_sigmoid\"\n  input: \"MaskRNN/hidden_t_prev\"\n  output: \"MaskRNN/modified_hidden_t_prev\"\n  name: \"\"\n  type: \"Mul\"\n}\nop {\n  input: \"MaskRNN/modified_hidden_t_prev\"\n  input: \"MaskRNN/output_gate_t_w\"\n  input: \"MaskRNN/output_gate_t_b\"\n  output: \"MaskRNN/output_gate_t\"\n  name: \"\"\n  type: \"FC\"\n  arg {\n    name: \"use_cudnn\"\n    i: 1\n  }\n  arg {\n    name: \"cudnn_exhaustive_search\"\n    i: 0\n  }\n  arg {\n    name: \"order\"\n    s: \"NCHW\"\n  }\n  arg {\n    name: \"axis\"\n    i: 2\n  }\n}\nop {\n  input: \"MaskRNN/update_gate_t\"\n  input: \"MaskRNN/input_t_update\"\n  output: \"MaskRNN/update_gate_t\"\n  name: \"\"\n  type: \"Sum\"\n}\nop {\n  input: \"MaskRNN/output_gate_t\"\n  input: \"MaskRNN/input_t_output\"\n  output: \"MaskRNN/output_gate_t\"\n  name: \"\"\n  type: \"Sum\"\n}\nop {\n  input: \"MaskRNN/reset_gate_t\"\n  input: \"MaskRNN/update_gate_t\"\n  input: \"MaskRNN/output_gate_t\"\n  output: \"MaskRNN/gates_t\"\n  output: \"MaskRNN/_gates_t_concat_dims\"\n  name: \"\"\n  type: \"Concat\"\n  arg {\n    name: \"axis\"\n    i: 2\n  }\n}\nop {\n  input: \"MaskRNN/hidden_t_prev\"\n  input: \"MaskRNN/gates_t\"\n  input: \"seq_lengths\"\n  input: \"timestep\"\n  output: \"MaskRNN/hidden_t\"\n  name: \"\"\n  type: \"GRUUnit\"\n  arg {\n    name: \"drop_states\"\n    i: 0\n  }\n  arg {\n    name: \"forget_bias\"\n    f: 0.0\n  }\n}\ntype: \"rnn\"\nexternal_input: \"input_t\"\nexternal_input: \"timestep\"\nexternal_input: \"MaskRNN/hidden_t_prev\"\nexternal_input: \"MaskRNN/reset_gate_t_w\"\nexternal_input: \"MaskRNN/reset_gate_t_b\"\nexternal_input: \"MaskRNN/update_gate_t_w\"\nexternal_input: \"MaskRNN/update_gate_t_b\"\nexternal_input: \"MaskRNN/output_gate_t_w\"\nexternal_input: \"MaskRNN/output_gate_t_b\"\nexternal_input: \"seq_lengths\"\nexternal_output: \"MaskRNN/hidden_t\"\n"
+  }
+  arg {
+    name: "backward_step_net_"
+    s: "name: \"RecurrentBackwardStep\"\nop {\n  input: \"MaskRNN/hidden_t_prev\"\n  input: \"MaskRNN/gates_t\"\n  input: \"seq_lengths\"\n  input: \"timestep\"\n  input: \"MaskRNN/hidden_t\"\n  input: \"MaskRNN/hidden_t_grad\"\n  output: \"MaskRNN/hidden_t_prev_grad\"\n  output: \"MaskRNN/gates_t_grad\"\n  name: \"\"\n  type: \"GRUUnitGradient\"\n  arg {\n    name: \"drop_states\"\n    i: 0\n  }\n  arg {\n    name: \"forget_bias\"\n    f: 0.0\n  }\n  is_gradient_op: true\n}\nop {\n  input: \"MaskRNN/gates_t_grad\"\n  input: \"MaskRNN/_gates_t_concat_dims\"\n  output: \"MaskRNN/reset_gate_t_grad\"\n  output: \"MaskRNN/update_gate_t_grad\"\n  output: \"MaskRNN/output_gate_t_grad\"\n  name: \"\"\n  type: \"Split\"\n  arg {\n    name: \"axis\"\n    i: 2\n  }\n  is_gradient_op: true\n}\nop {\n  input: \"MaskRNN/modified_hidden_t_prev\"\n  input: \"MaskRNN/output_gate_t_w\"\n  input: \"MaskRNN/output_gate_t_grad\"\n  output: \"MaskRNN/output_gate_t_w_grad\"\n  output: \"MaskRNN/output_gate_t_b_grad\"\n  output: \"MaskRNN/modified_hidden_t_prev_grad\"\n  name: \"\"\n  type: \"FCGradient\"\n  arg {\n    name: \"use_cudnn\"\n    i: 1\n  }\n  arg {\n    name: \"cudnn_exhaustive_search\"\n    i: 0\n  }\n  arg {\n    name: \"order\"\n    s: \"NCHW\"\n  }\n  arg {\n    name: \"axis\"\n    i: 2\n  }\n  is_gradient_op: true\n}\nop {\n  input: \"MaskRNN/modified_hidden_t_prev_grad\"\n  input: \"MaskRNN/hidden_t_prev\"\n  output: \"MaskRNN/reset_gate_t_sigmoid_grad\"\n  name: \"\"\n  type: \"Mul\"\n  is_gradient_op: true\n}\nop {\n  input: \"MaskRNN/modified_hidden_t_prev_grad\"\n  input: \"MaskRNN/reset_gate_t_sigmoid\"\n  output: \"_MaskRNN/hidden_t_prev_grad_autosplit_0\"\n  name: \"\"\n  type: \"Mul\"\n  is_gradient_op: true\n}\nop {\n  input: \"MaskRNN/reset_gate_t_sigmoid\"\n  input: \"MaskRNN/reset_gate_t_sigmoid_grad\"\n  output: \"_MaskRNN/reset_gate_t_grad_autosplit_0\"\n  name: \"\"\n  type: \"SigmoidGradient\"\n  is_gradient_op: true\n}\nop {\n  input: \"MaskRNN/reset_gate_t_grad\"\n  input: \"_MaskRNN/reset_gate_t_grad_autosplit_0\"\n  output: \"MaskRNN/reset_gate_t_grad\"\n  name: \"\"\n  type: \"Sum\"\n}\nop {\n  input: \"MaskRNN/hidden_t_prev\"\n  input: \"MaskRNN/update_gate_t_w\"\n  input: \"MaskRNN/update_gate_t_grad\"\n  output: \"MaskRNN/update_gate_t_w_grad\"\n  output: \"MaskRNN/update_gate_t_b_grad\"\n  output: \"_MaskRNN/hidden_t_prev_grad_autosplit_1\"\n  name: \"\"\n  type: \"FCGradient\"\n  arg {\n    name: \"use_cudnn\"\n    i: 1\n  }\n  arg {\n    name: \"cudnn_exhaustive_search\"\n    i: 0\n  }\n  arg {\n    name: \"order\"\n    s: \"NCHW\"\n  }\n  arg {\n    name: \"axis\"\n    i: 2\n  }\n  is_gradient_op: true\n}\nop {\n  input: \"MaskRNN/hidden_t_prev\"\n  input: \"MaskRNN/reset_gate_t_w\"\n  input: \"MaskRNN/reset_gate_t_grad\"\n  output: \"MaskRNN/reset_gate_t_w_grad\"\n  output: \"MaskRNN/reset_gate_t_b_grad\"\n  output: \"_MaskRNN/hidden_t_prev_grad_autosplit_2\"\n  name: \"\"\n  type: \"FCGradient\"\n  arg {\n    name: \"use_cudnn\"\n    i: 1\n  }\n  arg {\n    name: \"cudnn_exhaustive_search\"\n    i: 0\n  }\n  arg {\n    name: \"order\"\n    s: \"NCHW\"\n  }\n  arg {\n    name: \"axis\"\n    i: 2\n  }\n  is_gradient_op: true\n}\nop {\n  input: \"MaskRNN/hidden_t_prev_grad\"\n  input: \"_MaskRNN/hidden_t_prev_grad_autosplit_0\"\n  input: \"_MaskRNN/hidden_t_prev_grad_autosplit_1\"\n  input: \"_MaskRNN/hidden_t_prev_grad_autosplit_2\"\n  output: \"MaskRNN/hidden_t_prev_grad\"\n  name: \"\"\n  type: \"Sum\"\n}\nop {\n  input: \"MaskRNN/reset_gate_t_grad\"\n  input: \"MaskRNN/update_gate_t_grad\"\n  input: \"MaskRNN/output_gate_t_grad\"\n  output: \"input_t_grad\"\n  output: \"_input_t_grad_dims\"\n  name: \"\"\n  type: \"Concat\"\n  arg {\n    name: \"axis\"\n    i: 2\n  }\n  is_gradient_op: true\n}\ntype: \"simple\"\nexternal_input: \"MaskRNN/_gates_t_concat_dims\"\nexternal_input: \"MaskRNN/reset_gate_t_sigmoid\"\nexternal_input: \"MaskRNN/modified_hidden_t_prev\"\nexternal_input: \"MaskRNN/gates_t\"\nexternal_input: \"MaskRNN/hidden_t_grad\"\nexternal_input: \"input_t\"\nexternal_input: \"timestep\"\nexternal_input: \"MaskRNN/hidden_t_prev\"\nexternal_input: \"MaskRNN/reset_gate_t_w\"\nexternal_input: \"MaskRNN/reset_gate_t_b\"\nexternal_input: \"MaskRNN/update_gate_t_w\"\nexternal_input: \"MaskRNN/update_gate_t_b\"\nexternal_input: \"MaskRNN/output_gate_t_w\"\nexternal_input: \"MaskRNN/output_gate_t_b\"\nexternal_input: \"seq_lengths\"\nexternal_input: \"MaskRNN/hidden_t\"\n"
+  }
+  arg {
+    name: "alias_src"
+    strings: "MaskRNN/MaskRNN/hidden_t_prev_states"
+    strings: "MaskRNN/MaskRNN/hidden_t_prev_states"
+  }
+  arg {
+    name: "initial_recurrent_state_ids"
+    ints: 1
+  }
+  is_gradient_op: true
+}
+op {
+  input: "MaskRNN/masks"
+  input: "MaskRNN/masks_hidden_w"
+  input: "MaskRNN/inputs_masks_blob_grad"
+  output: "MaskRNN/masks_hidden_w_grad"
+  output: "MaskRNN/masks_hidden_b_grad"
+  output: "MaskRNN/masks_grad"
+  name: ""
+  type: "FCGradient"
+  arg {
+    name: "use_cudnn"
+    i: 1
+  }
+  arg {
+    name: "cudnn_exhaustive_search"
+    i: 0
+  }
+  arg {
+    name: "order"
+    s: "NCHW"
+  }
+  arg {
+    name: "axis"
+    i: 2
+  }
+  is_gradient_op: true
+}
+op {
+  input: "MaskRNN/masked_inputs"
+  input: "MaskRNN/masked_inputs_hidden_w"
+  input: "MaskRNN/inputs_masks_blob_grad"
+  output: "MaskRNN/masked_inputs_hidden_w_grad"
+  output: "MaskRNN/masked_inputs_hidden_b_grad"
+  output: "MaskRNN/masked_inputs_grad"
+  name: ""
+  type: "FCGradient"
+  arg {
+    name: "use_cudnn"
+    i: 1
+  }
+  arg {
+    name: "cudnn_exhaustive_search"
+    i: 0
+  }
+  arg {
+    name: "order"
+    s: "NCHW"
+  }
+  arg {
+    name: "axis"
+    i: 2
+  }
+  is_gradient_op: true
+}
+op {
+  input: "MaskRNN/masked_inputs_grad"
+  input: "MaskRNN/decayed_inputs_mean"
+  output: "MaskRNN/one_minus_masks_grad"
+  name: ""
+  type: "Mul"
+  is_gradient_op: true
+}
+op {
+  input: "MaskRNN/masked_inputs_grad"
+  input: "MaskRNN/one_minus_masks"
+  output: "MaskRNN/decayed_inputs_mean_grad"
+  name: ""
+  type: "Mul"
+  is_gradient_op: true
+}
+op {
+  input: "MaskRNN/decayed_inputs_mean_grad"
+  input: "MaskRNN/inputs_mean"
+  output: "MaskRNN/one_minus_decays_grad"
+  name: ""
+  type: "Mul"
+  is_gradient_op: true
+}
+op {
+  input: "MaskRNN/decayed_inputs_mean_grad"
+  input: "MaskRNN/one_minus_decays"
+  output: "MaskRNN/inputs_mean_grad"
+  name: ""
+  type: "Mul"
+  is_gradient_op: true
+}
+op {
+  input: "MaskRNN/masked_inputs_grad"
+  input: "MaskRNN/decayed_inputs_last"
+  output: "_MaskRNN/one_minus_masks_grad_autosplit_0"
+  name: ""
+  type: "Mul"
+  is_gradient_op: true
+}
+op {
+  input: "MaskRNN/masked_inputs_grad"
+  input: "MaskRNN/one_minus_masks"
+  output: "MaskRNN/decayed_inputs_last_grad"
+  name: ""
+  type: "Mul"
+  is_gradient_op: true
+}
+op {
+  input: "MaskRNN/one_minus_masks_grad"
+  input: "_MaskRNN/one_minus_masks_grad_autosplit_0"
+  output: "MaskRNN/one_minus_masks_grad"
+  name: ""
+  type: "Sum"
+}
+op {
+  input: "MaskRNN/decayed_inputs_last_grad"
+  input: "MaskRNN/inputs_last"
+  output: "input_decay/MaskRNN/decays_grad"
+  name: ""
+  type: "Mul"
+  is_gradient_op: true
+}
+op {
+  input: "MaskRNN/decayed_inputs_last_grad"
+  input: "input_decay/MaskRNN/decays"
+  output: "MaskRNN/inputs_last_grad"
+  name: ""
+  type: "Mul"
+  is_gradient_op: true
+}
+op {
+  input: "MaskRNN/masked_inputs_grad"
+  input: "MaskRNN/inputs"
+  output: "_MaskRNN/masks_grad_autosplit_0"
+  name: ""
+  type: "Mul"
+  is_gradient_op: true
+}
+op {
+  input: "MaskRNN/masked_inputs_grad"
+  input: "MaskRNN/masks"
+  output: "MaskRNN/inputs_grad"
+  name: ""
+  type: "Mul"
+  is_gradient_op: true
+}
+op {
+  input: "MaskRNN/one_minus_decays_grad"
+  output: "_input_decay/MaskRNN/decays_grad_autosplit_0"
+  name: ""
+  type: "Negative"
+  is_gradient_op: true
+}
+op {
+  input: "input_decay/MaskRNN/decays_grad"
+  input: "_input_decay/MaskRNN/decays_grad_autosplit_0"
+  output: "input_decay/MaskRNN/decays_grad"
+  name: ""
+  type: "Sum"
+}
+op {
+  input: "MaskRNN/one_minus_masks_grad"
+  output: "_MaskRNN/masks_grad_autosplit_1"
+  name: ""
+  type: "Negative"
+  is_gradient_op: true
+}
+op {
+  input: "MaskRNN/one_minus_decays_grad"
+  input: "MaskRNN/one_minus_masks_grad"
+  output: "MaskRNN/ONES_grad"
+  name: ""
+  type: "Sum"
+}
+op {
+  input: "MaskRNN/masks_grad"
+  input: "_MaskRNN/masks_grad_autosplit_0"
+  input: "_MaskRNN/masks_grad_autosplit_1"
+  output: "MaskRNN/masks_grad"
+  name: ""
+  type: "Sum"
+}
+op {
+  input: "input_decay/MaskRNN/decays"
+  input: "input_decay/MaskRNN/decays_grad"
+  output: "input_decay/MaskRNN/neg_max_interval_fc_grad"
+  name: ""
+  type: "Mul"
+  is_gradient_op: true
+}
+op {
+  input: "input_decay/MaskRNN/neg_max_interval_fc_grad"
+  output: "input_decay/MaskRNN/max_intervals_fc_grad"
+  name: ""
+  type: "Negative"
+  is_gradient_op: true
+}
+op {
+  input: "input_decay/MaskRNN/max_intervals_fc"
+  input: "input_decay/MaskRNN/max_intervals_fc_grad"
+  input: "input_decay/MaskRNN/intervals_fc"
+  input: "input_decay/MaskRNN/ZEROS"
+  output: "input_decay/MaskRNN/intervals_fc_grad"
+  output: "input_decay/MaskRNN/ZEROS_grad"
+  name: ""
+  type: "MaxGradient"
+  is_gradient_op: true
+}
+op {
+  input: "MaskRNN/intervals"
+  input: "input_decay/MaskRNN/intervals_fc_w"
+  input: "input_decay/MaskRNN/intervals_fc_grad"
+  output: "input_decay/MaskRNN/intervals_fc_w_grad"
+  output: "input_decay/MaskRNN/intervals_fc_b_grad"
+  output: "MaskRNN/intervals_grad"
+  name: ""
+  type: "FCGradient"
+  arg {
+    name: "use_cudnn"
+    i: 1
+  }
+  arg {
+    name: "cudnn_exhaustive_search"
+    i: 0
+  }
+  arg {
+    name: "order"
+    s: "NCHW"
+  }
+  arg {
+    name: "axis"
+    i: 2
+  }
+  is_gradient_op: true
+}
+op {
+  input: "MaskRNN/inputs_grad"
+  input: "MaskRNN/inputs_last_grad"
+  input: "MaskRNN/inputs_mean_grad"
+  input: "MaskRNN/masks_grad"
+  input: "MaskRNN/intervals_grad"
+  output: "input_blob_grad"
+  output: "_input_blob_grad_dims"
+  name: ""
+  type: "Concat"
+  arg {
+    name: "axis"
+    i: 2
+  }
+  is_gradient_op: true
+}
+op {
+  input: "input_blob_grad"
+  output: "input_blob_batch_first_grad"
+  name: ""
+  type: "Transpose"
+  arg {
+    name: "axes"
+    ints: 1
+    ints: 0
+    ints: 2
+  }
+  is_gradient_op: true
+}
+op {
+  input: "iteration_mutex"
+  input: "optimizer_iteration"
+  output: "optimizer_iteration"
+  name: ""
+  type: "AtomicIter"
+  device_option {
+    device_type: 0
+    cuda_gpu_id: 0
+  }
+}
+op {
+  input: "optimizer_iteration"
+  output: "AdamOptimizer_0_lr_cpu"
+  name: ""
+  type: "LearningRate"
+  arg {
+    name: "policy"
+    s: "fixed"
+  }
+  arg {
+    name: "base_lr"
+    f: -0.0189999993891
+  }
+  device_option {
+  }
+}
+op {
+  input: "MaskRNN/output_gate_t_w"
+  input: "MaskRNN/output_gate_t_w_first_moment"
+  input: "MaskRNN/output_gate_t_w_second_moment"
+  input: "MaskRNN/output_gate_t_w_grad"
+  input: "AdamOptimizer_0_lr_cpu"
+  input: "optimizer_iteration"
+  output: "MaskRNN/output_gate_t_w"
+  output: "MaskRNN/output_gate_t_w_first_moment"
+  output: "MaskRNN/output_gate_t_w_second_moment"
+  name: ""
+  type: "Adam"
+  arg {
+    name: "epsilon"
+    f: 9.99999993923e-09
+  }
+  arg {
+    name: "beta2"
+    f: 0.999000012875
+  }
+  arg {
+    name: "beta1"
+    f: 0.899999976158
+  }
+  device_option {
+  }
+}
+op {
+  input: "MaskRNN/reset_gate_t_b"
+  input: "MaskRNN/reset_gate_t_b_first_moment"
+  input: "MaskRNN/reset_gate_t_b_second_moment"
+  input: "MaskRNN/reset_gate_t_b_grad"
+  input: "AdamOptimizer_0_lr_cpu"
+  input: "optimizer_iteration"
+  output: "MaskRNN/reset_gate_t_b"
+  output: "MaskRNN/reset_gate_t_b_first_moment"
+  output: "MaskRNN/reset_gate_t_b_second_moment"
+  name: ""
+  type: "Adam"
+  arg {
+    name: "epsilon"
+    f: 9.99999993923e-09
+  }
+  arg {
+    name: "beta2"
+    f: 0.999000012875
+  }
+  arg {
+    name: "beta1"
+    f: 0.899999976158
+  }
+  device_option {
+  }
+}
+op {
+  input: "MaskRNN/update_gate_t_b"
+  input: "MaskRNN/update_gate_t_b_first_moment"
+  input: "MaskRNN/update_gate_t_b_second_moment"
+  input: "MaskRNN/update_gate_t_b_grad"
+  input: "AdamOptimizer_0_lr_cpu"
+  input: "optimizer_iteration"
+  output: "MaskRNN/update_gate_t_b"
+  output: "MaskRNN/update_gate_t_b_first_moment"
+  output: "MaskRNN/update_gate_t_b_second_moment"
+  name: ""
+  type: "Adam"
+  arg {
+    name: "epsilon"
+    f: 9.99999993923e-09
+  }
+  arg {
+    name: "beta2"
+    f: 0.999000012875
+  }
+  arg {
+    name: "beta1"
+    f: 0.899999976158
+  }
+  device_option {
+  }
+}
+op {
+  input: "MaskRNN/masks_hidden_b"
+  input: "MaskRNN/masks_hidden_b_first_moment"
+  input: "MaskRNN/masks_hidden_b_second_moment"
+  input: "MaskRNN/masks_hidden_b_grad"
+  input: "AdamOptimizer_0_lr_cpu"
+  input: "optimizer_iteration"
+  output: "MaskRNN/masks_hidden_b"
+  output: "MaskRNN/masks_hidden_b_first_moment"
+  output: "MaskRNN/masks_hidden_b_second_moment"
+  name: ""
+  type: "Adam"
+  arg {
+    name: "epsilon"
+    f: 9.99999993923e-09
+  }
+  arg {
+    name: "beta2"
+    f: 0.999000012875
+  }
+  arg {
+    name: "beta1"
+    f: 0.899999976158
+  }
+  device_option {
+  }
+}
+op {
+  input: "mask_rnn_blob_0_w"
+  input: "mask_rnn_blob_0_w_first_moment"
+  input: "mask_rnn_blob_0_w_second_moment"
+  input: "mask_rnn_blob_0_w_grad"
+  input: "AdamOptimizer_0_lr_cpu"
+  input: "optimizer_iteration"
+  output: "mask_rnn_blob_0_w"
+  output: "mask_rnn_blob_0_w_first_moment"
+  output: "mask_rnn_blob_0_w_second_moment"
+  name: ""
+  type: "Adam"
+  arg {
+    name: "epsilon"
+    f: 9.99999993923e-09
+  }
+  arg {
+    name: "beta2"
+    f: 0.999000012875
+  }
+  arg {
+    name: "beta1"
+    f: 0.899999976158
+  }
+  device_option {
+  }
+}
+op {
+  input: "MaskRNN/masked_inputs_hidden_w"
+  input: "MaskRNN/masked_inputs_hidden_w_first_moment"
+  input: "MaskRNN/masked_inputs_hidden_w_second_moment"
+  input: "MaskRNN/masked_inputs_hidden_w_grad"
+  input: "AdamOptimizer_0_lr_cpu"
+  input: "optimizer_iteration"
+  output: "MaskRNN/masked_inputs_hidden_w"
+  output: "MaskRNN/masked_inputs_hidden_w_first_moment"
+  output: "MaskRNN/masked_inputs_hidden_w_second_moment"
+  name: ""
+  type: "Adam"
+  arg {
+    name: "epsilon"
+    f: 9.99999993923e-09
+  }
+  arg {
+    name: "beta2"
+    f: 0.999000012875
+  }
+  arg {
+    name: "beta1"
+    f: 0.899999976158
+  }
+  device_option {
+  }
+}
+op {
+  input: "input_decay/MaskRNN/intervals_fc_b"
+  input: "input_decay/MaskRNN/intervals_fc_b_first_moment"
+  input: "input_decay/MaskRNN/intervals_fc_b_second_moment"
+  input: "input_decay/MaskRNN/intervals_fc_b_grad"
+  input: "AdamOptimizer_0_lr_cpu"
+  input: "optimizer_iteration"
+  output: "input_decay/MaskRNN/intervals_fc_b"
+  output: "input_decay/MaskRNN/intervals_fc_b_first_moment"
+  output: "input_decay/MaskRNN/intervals_fc_b_second_moment"
+  name: ""
+  type: "Adam"
+  arg {
+    name: "epsilon"
+    f: 9.99999993923e-09
+  }
+  arg {
+    name: "beta2"
+    f: 0.999000012875
+  }
+  arg {
+    name: "beta1"
+    f: 0.899999976158
+  }
+  device_option {
+  }
+}
+op {
+  input: "mask_rnn_blob_1_b"
+  input: "mask_rnn_blob_1_b_first_moment"
+  input: "mask_rnn_blob_1_b_second_moment"
+  input: "mask_rnn_blob_1_b_grad"
+  input: "AdamOptimizer_0_lr_cpu"
+  input: "optimizer_iteration"
+  output: "mask_rnn_blob_1_b"
+  output: "mask_rnn_blob_1_b_first_moment"
+  output: "mask_rnn_blob_1_b_second_moment"
+  name: ""
+  type: "Adam"
+  arg {
+    name: "epsilon"
+    f: 9.99999993923e-09
+  }
+  arg {
+    name: "beta2"
+    f: 0.999000012875
+  }
+  arg {
+    name: "beta1"
+    f: 0.899999976158
+  }
+  device_option {
+  }
+}
+op {
+  input: "MaskRNN/update_gate_t_w"
+  input: "MaskRNN/update_gate_t_w_first_moment"
+  input: "MaskRNN/update_gate_t_w_second_moment"
+  input: "MaskRNN/update_gate_t_w_grad"
+  input: "AdamOptimizer_0_lr_cpu"
+  input: "optimizer_iteration"
+  output: "MaskRNN/update_gate_t_w"
+  output: "MaskRNN/update_gate_t_w_first_moment"
+  output: "MaskRNN/update_gate_t_w_second_moment"
+  name: ""
+  type: "Adam"
+  arg {
+    name: "epsilon"
+    f: 9.99999993923e-09
+  }
+  arg {
+    name: "beta2"
+    f: 0.999000012875
+  }
+  arg {
+    name: "beta1"
+    f: 0.899999976158
+  }
+  device_option {
+  }
+}
+op {
+  input: "MaskRNN/reset_gate_t_w"
+  input: "MaskRNN/reset_gate_t_w_first_moment"
+  input: "MaskRNN/reset_gate_t_w_second_moment"
+  input: "MaskRNN/reset_gate_t_w_grad"
+  input: "AdamOptimizer_0_lr_cpu"
+  input: "optimizer_iteration"
+  output: "MaskRNN/reset_gate_t_w"
+  output: "MaskRNN/reset_gate_t_w_first_moment"
+  output: "MaskRNN/reset_gate_t_w_second_moment"
+  name: ""
+  type: "Adam"
+  arg {
+    name: "epsilon"
+    f: 9.99999993923e-09
+  }
+  arg {
+    name: "beta2"
+    f: 0.999000012875
+  }
+  arg {
+    name: "beta1"
+    f: 0.899999976158
+  }
+  device_option {
+  }
+}
+op {
+  input: "MaskRNN/masks_hidden_w"
+  input: "MaskRNN/masks_hidden_w_first_moment"
+  input: "MaskRNN/masks_hidden_w_second_moment"
+  input: "MaskRNN/masks_hidden_w_grad"
+  input: "AdamOptimizer_0_lr_cpu"
+  input: "optimizer_iteration"
+  output: "MaskRNN/masks_hidden_w"
+  output: "MaskRNN/masks_hidden_w_first_moment"
+  output: "MaskRNN/masks_hidden_w_second_moment"
+  name: ""
+  type: "Adam"
+  arg {
+    name: "epsilon"
+    f: 9.99999993923e-09
+  }
+  arg {
+    name: "beta2"
+    f: 0.999000012875
+  }
+  arg {
+    name: "beta1"
+    f: 0.899999976158
+  }
+  device_option {
+  }
+}
+op {
+  input: "mask_rnn_blob_0_b"
+  input: "mask_rnn_blob_0_b_first_moment"
+  input: "mask_rnn_blob_0_b_second_moment"
+  input: "mask_rnn_blob_0_b_grad"
+  input: "AdamOptimizer_0_lr_cpu"
+  input: "optimizer_iteration"
+  output: "mask_rnn_blob_0_b"
+  output: "mask_rnn_blob_0_b_first_moment"
+  output: "mask_rnn_blob_0_b_second_moment"
+  name: ""
+  type: "Adam"
+  arg {
+    name: "epsilon"
+    f: 9.99999993923e-09
+  }
+  arg {
+    name: "beta2"
+    f: 0.999000012875
+  }
+  arg {
+    name: "beta1"
+    f: 0.899999976158
+  }
+  device_option {
+  }
+}
+op {
+  input: "MaskRNN/output_gate_t_b"
+  input: "MaskRNN/output_gate_t_b_first_moment"
+  input: "MaskRNN/output_gate_t_b_second_moment"
+  input: "MaskRNN/output_gate_t_b_grad"
+  input: "AdamOptimizer_0_lr_cpu"
+  input: "optimizer_iteration"
+  output: "MaskRNN/output_gate_t_b"
+  output: "MaskRNN/output_gate_t_b_first_moment"
+  output: "MaskRNN/output_gate_t_b_second_moment"
+  name: ""
+  type: "Adam"
+  arg {
+    name: "epsilon"
+    f: 9.99999993923e-09
+  }
+  arg {
+    name: "beta2"
+    f: 0.999000012875
+  }
+  arg {
+    name: "beta1"
+    f: 0.899999976158
+  }
+  device_option {
+  }
+}
+op {
+  input: "mask_rnn_blob_1_w"
+  input: "mask_rnn_blob_1_w_first_moment"
+  input: "mask_rnn_blob_1_w_second_moment"
+  input: "mask_rnn_blob_1_w_grad"
+  input: "AdamOptimizer_0_lr_cpu"
+  input: "optimizer_iteration"
+  output: "mask_rnn_blob_1_w"
+  output: "mask_rnn_blob_1_w_first_moment"
+  output: "mask_rnn_blob_1_w_second_moment"
+  name: ""
+  type: "Adam"
+  arg {
+    name: "epsilon"
+    f: 9.99999993923e-09
+  }
+  arg {
+    name: "beta2"
+    f: 0.999000012875
+  }
+  arg {
+    name: "beta1"
+    f: 0.899999976158
+  }
+  device_option {
+  }
+}
+op {
+  input: "MaskRNN/masked_inputs_hidden_b"
+  input: "MaskRNN/masked_inputs_hidden_b_first_moment"
+  input: "MaskRNN/masked_inputs_hidden_b_second_moment"
+  input: "MaskRNN/masked_inputs_hidden_b_grad"
+  input: "AdamOptimizer_0_lr_cpu"
+  input: "optimizer_iteration"
+  output: "MaskRNN/masked_inputs_hidden_b"
+  output: "MaskRNN/masked_inputs_hidden_b_first_moment"
+  output: "MaskRNN/masked_inputs_hidden_b_second_moment"
+  name: ""
+  type: "Adam"
+  arg {
+    name: "epsilon"
+    f: 9.99999993923e-09
+  }
+  arg {
+    name: "beta2"
+    f: 0.999000012875
+  }
+  arg {
+    name: "beta1"
+    f: 0.899999976158
+  }
+  device_option {
+  }
+}
+op {
+  input: "input_decay/MaskRNN/intervals_fc_w"
+  input: "input_decay/MaskRNN/intervals_fc_w_first_moment"
+  input: "input_decay/MaskRNN/intervals_fc_w_second_moment"
+  input: "input_decay/MaskRNN/intervals_fc_w_grad"
+  input: "AdamOptimizer_0_lr_cpu"
+  input: "optimizer_iteration"
+  output: "input_decay/MaskRNN/intervals_fc_w"
+  output: "input_decay/MaskRNN/intervals_fc_w_first_moment"
+  output: "input_decay/MaskRNN/intervals_fc_w_second_moment"
+  name: ""
+  type: "Adam"
+  arg {
+    name: "epsilon"
+    f: 9.99999993923e-09
+  }
+  arg {
+    name: "beta2"
+    f: 0.999000012875
+  }
+  arg {
+    name: "beta1"
+    f: 0.899999976158
+  }
+  device_option {
+  }
+}
+external_input: "hidden_init"
+external_input: "input_blob"
+external_input: "seq_lengths"
+external_input: "target"
+external_input: "dbreader_train"
+external_input: "input_decay/MaskRNN/intervals_fc_w"
+external_input: "input_decay/MaskRNN/intervals_fc_b"
+external_input: "MaskRNN/masked_inputs_hidden_w"
+external_input: "MaskRNN/masked_inputs_hidden_b"
+external_input: "MaskRNN/masks_hidden_w"
+external_input: "MaskRNN/masks_hidden_b"
+external_input: "MaskRNN/reset_gate_t_w"
+external_input: "MaskRNN/reset_gate_t_b"
+external_input: "MaskRNN/update_gate_t_w"
+external_input: "MaskRNN/update_gate_t_b"
+external_input: "MaskRNN/output_gate_t_w"
+external_input: "MaskRNN/output_gate_t_b"
+external_input: "mask_rnn_blob_0_w"
+external_input: "mask_rnn_blob_0_b"
+external_input: "mask_rnn_blob_1_w"
+external_input: "mask_rnn_blob_1_b"
+external_input: "iteration_mutex"
+external_input: "optimizer_iteration"
+external_input: "MaskRNN/output_gate_t_w_first_moment"
+external_input: "MaskRNN/output_gate_t_w_second_moment"
+external_input: "MaskRNN/reset_gate_t_b_first_moment"
+external_input: "MaskRNN/reset_gate_t_b_second_moment"
+external_input: "MaskRNN/update_gate_t_b_first_moment"
+external_input: "MaskRNN/update_gate_t_b_second_moment"
+external_input: "MaskRNN/masks_hidden_b_first_moment"
+external_input: "MaskRNN/masks_hidden_b_second_moment"
+external_input: "mask_rnn_blob_0_w_first_moment"
+external_input: "mask_rnn_blob_0_w_second_moment"
+external_input: "MaskRNN/masked_inputs_hidden_w_first_moment"
+external_input: "MaskRNN/masked_inputs_hidden_w_second_moment"
+external_input: "input_decay/MaskRNN/intervals_fc_b_first_moment"
+external_input: "input_decay/MaskRNN/intervals_fc_b_second_moment"
+external_input: "mask_rnn_blob_1_b_first_moment"
+external_input: "mask_rnn_blob_1_b_second_moment"
+external_input: "MaskRNN/update_gate_t_w_first_moment"
+external_input: "MaskRNN/update_gate_t_w_second_moment"
+external_input: "MaskRNN/reset_gate_t_w_first_moment"
+external_input: "MaskRNN/reset_gate_t_w_second_moment"
+external_input: "MaskRNN/masks_hidden_w_first_moment"
+external_input: "MaskRNN/masks_hidden_w_second_moment"
+external_input: "mask_rnn_blob_0_b_first_moment"
+external_input: "mask_rnn_blob_0_b_second_moment"
+external_input: "MaskRNN/output_gate_t_b_first_moment"
+external_input: "MaskRNN/output_gate_t_b_second_moment"
+external_input: "mask_rnn_blob_1_w_first_moment"
+external_input: "mask_rnn_blob_1_w_second_moment"
+external_input: "MaskRNN/masked_inputs_hidden_b_first_moment"
+external_input: "MaskRNN/masked_inputs_hidden_b_second_moment"
+external_input: "input_decay/MaskRNN/intervals_fc_w_first_moment"
+external_input: "input_decay/MaskRNN/intervals_fc_w_second_moment"

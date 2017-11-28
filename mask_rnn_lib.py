@@ -149,20 +149,13 @@ class MaskRNN(object):
         # Then, we add loss and gradient ops
         # We treat them as one big batch of size T * N
         # we use the logit of classification head
-        # class_output_reshaped, _ = model.net.Reshape(
-        #     class_output, ['class_output_reshaped', '_class_output_shape'], 
-        #     shape=[-1, self.class_output_dim])
-        class_softmax_output_reshaped, _ = model.net.Reshape(
-            class_softmax_output, ['class_softmax_output_reshaped', '_class_output_shape'], 
-            shape=[-1, self.class_output_dim])
-
         regre_output_reshaped, _ = model.net.Reshape(
             regre_output, ['regre_output_reshaped', '_regre_output_shape'], 
             shape=[-1, self.regre_output_dim])
 
-        class_target_reshaped, _ = model.net.Reshape(
-            class_target, ['class_target_reshaped', '_class_target_shape'], 
-            shape=[-1, self.class_output_dim])
+        # class_target_reshaped, _ = model.net.Reshape(
+        #     class_target, ['class_target_reshaped', '_class_target_shape'], 
+        #     shape=[-1, self.class_output_dim])
         regre_target_reshaped, _ = model.net.Reshape(
             regre_target, ['regre_target_reshaped', '_regre_target_shape'], 
             shape=[-1, self.regre_output_dim])
@@ -175,9 +168,9 @@ class MaskRNN(object):
             shape=[-1, self.regre_output_dim])
 
         # stop gradient to label and mask
-        class_target_reshaped = model.net.StopGradient(
-            class_target_reshaped, 'stopped_class_target_reshaped'
-        )
+        # class_target_reshaped = model.net.StopGradient(
+        #     class_target_reshaped, 'stopped_class_target_reshaped'
+        # )
         regre_target_reshaped = model.net.StopGradient(
             regre_target_reshaped, 'stopped_regre_target_reshaped'
         )
@@ -190,6 +183,10 @@ class MaskRNN(object):
 
         # model.net.Print([class_output_reshaped], 'print', to_file=0)
         # classification error
+        ## Method 1
+        # class_output_reshaped, _ = model.net.Reshape(
+        #     class_output, ['class_output_reshaped', '_class_output_shape'], 
+        #     shape=[-1, self.class_output_dim])
         # combined softmax and log likelihood for numerical stability
         # weighted by class_target_mask_reshaped
         #
@@ -197,15 +194,41 @@ class MaskRNN(object):
         #     [class_output_reshaped, class_target_reshaped, class_target_mask_reshaped],
         #     ['_train_softmax_ouput', 'class_average_loss'], label_prob=1
         # )
-        #
-        class_l2_dist = model.net.SquaredL2Distance(
-            [class_softmax_output_reshaped, class_target_reshaped], 'class_l2_dist')
+
+        ## Method 2
+        # class_softmax_output_reshaped, _ = model.net.Reshape(
+        #     class_softmax_output, ['class_softmax_output_reshaped', '_class_output_shape'], 
+        #     shape=[-1, self.class_output_dim])
         class_target_mask_reshaped = model.net.Squeeze(
             class_target_mask_reshaped, 'squeezed_class_target_mask', dims=[1])
-        masked_class_l2_dist = model.net.Mul(
-            [class_target_mask_reshaped, class_l2_dist], 'masked_class_l2_dist')
+        # class_l2_dist = model.net.SquaredL2Distance(
+        #     [class_softmax_output_reshaped, class_target_reshaped], 'class_l2_dist')
+        # masked_class_l2_dist = model.net.Mul(
+        #     [class_target_mask_reshaped, class_l2_dist], 'masked_class_l2_dist')
+        # class_average_loss = model.net.AveragedLoss(
+        #     masked_class_l2_dist, 'class_average_loss')
+
+        ## Method 3 (negative log likelihood)
+        class_target = model.net.StopGradient(
+            class_target, 'stopped_class_target'
+        )
+        correct_class = model.net.Mul(
+            [class_softmax_output, class_target], 'correct_class')
+        correct_class_reduced = model.net.ReduceBackSum(
+            correct_class, 'correct_class_reduced')
+        # [SEQ_LEN, BATCHSIZE] -> [SEQ_LEN * BATCHSIZE,]
+        correct_class_reshaped, _ = model.net.Reshape(
+            correct_class_reduced, ['class_target_reshaped', '_class_target_shape'], 
+            shape=[-1,])
+        neglog_correct_class_reshaped = model.net.Negative(
+            model.net.Log(correct_class_reshaped, 'log_correct_class_reshaped'),
+            'neglog_correct_class_reshaped')
+        masked_correct_class_reshaped = model.net.Mul(
+            [neglog_correct_class_reshaped, class_target_mask_reshaped], 
+            'masked_correct_class_reshaped')
         class_average_loss = model.net.AveragedLoss(
-            masked_class_l2_dist, 'class_average_loss')
+            masked_correct_class_reshaped, 'class_average_loss')
+
 
         # regression error
         # mask need to be applied to *each* individual dimension of output vector
@@ -241,9 +264,9 @@ class MaskRNN(object):
             i += 1
 
         assert i == self.regre_output_dim, 'output dim != # of loss split'
-
+        total_loss = model.net.Sum([class_average_loss] + regre_average_loss_lst, 'total_loss')
         # Training net
-        model.AddGradientOperators([class_average_loss] + regre_average_loss_lst)
+        model.AddGradientOperators([total_loss])
         build_adam(
             model,
             base_learning_rate=base_learning_rate*self.seq_size,
