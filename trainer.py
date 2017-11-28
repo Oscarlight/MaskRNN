@@ -16,7 +16,7 @@ CLASS_OUTPUT_DIM = 3
 REGRE_OUTPUT_DIM = 3
 
 
-parser = argparse.ArgumentParser(description='A3C-Doom')
+parser = argparse.ArgumentParser(description='MaskRNN')
 parser.add_argument("-model_path", type=str,
                     help="model4/")
 parser.add_argument("-hidden_size", type=int,

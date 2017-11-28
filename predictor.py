@@ -3,6 +3,8 @@ import numpy as np
 from caffe2.python import (
 	workspace, core
 )
+from eval import MAUC, calcBCA
+
 SEQ_LEN = 19
 HIDDEN_DIM = 256
 
@@ -47,12 +49,27 @@ def compute_regre_error(reg_output, reg_target, reg_mask, start_end_index):
 		mse.append(np.mean(np.array(mse_dict[j])))
 	return mse
 
-def compute_mAUC(class_output, class_target, class_mask, start_end_index):
+def compute_mAUC_BCA(class_output, class_target, class_mask, start_end_index):
+	estimLabels=[]; trueLabels=[]; data=[]
+	for i in range(class_output.shape[0]): # each example
+		start = start_end_index[i, 0]
+		end = start_end_index[i, 1]
+		for k in range(start, end+1): # in a seq
+			if class_mask[i, k, 0] > 0.5: # class_mask
+				estimLabels.append(np.argmax(class_output[i, k, :]))
+				trueLabels.append(np.argmax(class_target[i, k, :]))
+				# assert
+				label, = np.where(class_target[i, k, :]==1.0)
+				assert np.argmax(class_target[i, k, :]) == label[0]
+				#
+				data.append((label[0], class_output[i, k, :]))
+
+	return (MAUC(data, 3), calcBCA(estimLabels, trueLabels, 3))
 
 
 if __name__ == '__main__':
-	data_path = './data/new/'
-	model_name = 'model2/MaskRNN'
+	data_path = './data/'
+	model_name = 'model3/MaskRNN'
 	index = 100
 	tar_mean = np.load(data_path + 'tar_mean.npy').astype(np.float32)
 	tar_std = np.load(data_path + 'tar_std.npy').astype(np.float32)
@@ -64,6 +81,8 @@ if __name__ == '__main__':
 	train_regre_output = np.multiply(target[1], tar_std) + tar_mean
 	print(compute_regre_error(train_regre_output, train_regre_target, 
 		train_targets[:,:,7:10], train_start_end_index))
+	print(compute_mAUC_BCA(target[1], train_targets[:,:,0:3], 
+		train_targets[:,:,6:7], train_start_end_index))
 	# test
 	for data_type in ['valid','test']:
 		(test_seq_lens, test_features, 
@@ -73,4 +92,6 @@ if __name__ == '__main__':
 		test_regre_output = np.multiply(target[1], tar_std) + tar_mean
 		print(compute_regre_error(test_regre_output, test_regre_target, 
 			test_targets[:,:,7:10], test_start_end_index))
-		quit()
+		print(compute_mAUC_BCA(target[1], test_targets[:,:,0:3], 
+			test_targets[:,:,6:7], test_start_end_index))
+		
