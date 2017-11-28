@@ -149,9 +149,13 @@ class MaskRNN(object):
         # Then, we add loss and gradient ops
         # We treat them as one big batch of size T * N
         # we use the logit of classification head
-        class_output_reshaped, _ = model.net.Reshape(
-            class_output, ['class_output_reshaped', '_class_output_shape'], 
+        # class_output_reshaped, _ = model.net.Reshape(
+        #     class_output, ['class_output_reshaped', '_class_output_shape'], 
+        #     shape=[-1, self.class_output_dim])
+        class_softmax_output_reshaped, _ = model.net.Reshape(
+            class_softmax_output, ['class_softmax_output_reshaped', '_class_output_shape'], 
             shape=[-1, self.class_output_dim])
+
         regre_output_reshaped, _ = model.net.Reshape(
             regre_output, ['regre_output_reshaped', '_regre_output_shape'], 
             shape=[-1, self.regre_output_dim])
@@ -164,10 +168,10 @@ class MaskRNN(object):
             shape=[-1, self.regre_output_dim])
 
         class_target_mask_reshaped, _ = model.net.Reshape(
-            class_target, ['class_target_mask_reshaped', '_class_target_mask_shape'], 
+            class_target_mask, ['class_target_mask_reshaped', '_class_target_mask_shape'], 
             shape=[-1, 1])
         regre_target_mask_reshaped, _ = model.net.Reshape(
-            regre_target, ['regre_target_mask_reshaped', '_regre_target_mask_shape'], 
+            regre_target_mask, ['regre_target_mask_reshaped', '_regre_target_mask_shape'], 
             shape=[-1, self.regre_output_dim])
 
         # stop gradient to label and mask
@@ -188,10 +192,21 @@ class MaskRNN(object):
         # classification error
         # combined softmax and log likelihood for numerical stability
         # weighted by class_target_mask_reshaped
-        _, class_average_loss = model.net.SoftmaxWithLoss(
-            [class_output_reshaped, class_target_reshaped, class_target_mask_reshaped],
-            ['_train_softmax_ouput', 'class_average_loss'], label_prob=1
-        )
+        #
+        # _, class_average_loss = model.net.SoftmaxWithLoss(
+        #     [class_output_reshaped, class_target_reshaped, class_target_mask_reshaped],
+        #     ['_train_softmax_ouput', 'class_average_loss'], label_prob=1
+        # )
+        #
+        class_l2_dist = model.net.SquaredL2Distance(
+            [class_softmax_output_reshaped, class_target_reshaped], 'class_l2_dist')
+        class_target_mask_reshaped = model.net.Squeeze(
+            class_target_mask_reshaped, 'squeezed_class_target_mask', dims=[1])
+        masked_class_l2_dist = model.net.Mul(
+            [class_target_mask_reshaped, class_l2_dist], 'masked_class_l2_dist')
+        class_average_loss = model.net.AveragedLoss(
+            masked_class_l2_dist, 'class_average_loss')
+
         # regression error
         # mask need to be applied to *each* individual dimension of output vector
         regre_output_reshaped_list = model.net.Split(
@@ -218,10 +233,11 @@ class MaskRNN(object):
                 [o, t], 'l2_dist_' + str(i))
             m = model.net.Squeeze(
                 m, 'squeezed_regre_target_mask_' + str(i), dims=[1])
-            weighted_l2_dist = model.net.Mul(
-                [l2_dist, m], 'weighted_l2_dist_' + str(i))
+            masked_l2_dist = model.net.Mul(
+                [m, l2_dist], 'masked_l2_dist_' + str(i))
+            # masked_l2_dist = l2_dist
             regre_average_loss_lst.append(model.net.AveragedLoss(
-                weighted_l2_dist, 'regre_average_loss_' + str(i)))
+                masked_l2_dist, 'regre_average_loss_' + str(i)))
             i += 1
 
         assert i == self.regre_output_dim, 'output dim != # of loss split'
@@ -272,21 +288,30 @@ class MaskRNN(object):
             CreateNetOnce(self.model.net)
             workspace.RunNet(self.model.net.Name())
 
-            if num_iter % iters_to_report == 0:
+            if num_iter % iters_to_report == 0 and num_iter != 0:
                 self.reports['epoch'].append(num_iter)
                 for loss in self.loss:
                     loss = str(loss)
-                    self.reports[loss].append(
-                        workspace.FetchBlob(loss)
-                    )
+                    loss_value = workspace.FetchBlob(loss)
+                    self.reports[loss].append(loss_value)
+                    # print('num iter: %d ---- %s = %f'.format(
+                    #     num_iter, loss, loss_value))
+                # Save Net
+                exporter.save_net(
+                    self.model,
+                    self.net_store['predict'], 
+                    self.model_name+str(num_iter)+'_init', 
+                    self.model_name+str(num_iter)+'_predict' 
+                )
 
         print('>>> Saving test model')
 
         # Save Net
         exporter.save_net(
-            self.net_store['predict'], 
-            self.model.param_init_net, 
-            self.model_name+'_init', self.model_name+'_predict'
+            self.model,
+            self.net_store['predict'],  
+            self.model_name+str(num_iter)+'_init',
+            self.model_name+str(num_iter)+'_predict' 
         )
 
         # Save report
@@ -323,7 +348,7 @@ def main():
     INPUT_DIM = 2
     CLASS_OUTPUT_DIM = 2
     REGRE_OUTPUT_DIM = 2
-    model_path = 'model1/'
+    model_path = 'model0/'
     if not os.path.exists(model_path):
         os.makedirs(model_path)
     my_model = MaskRNN(
