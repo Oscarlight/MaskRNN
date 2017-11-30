@@ -18,7 +18,7 @@ REGRE_OUTPUT_DIM = 3
 
 parser = argparse.ArgumentParser(description='MaskRNN')
 parser.add_argument("-model_path", type=str,
-                    help="model4/")
+                    help="model/")
 parser.add_argument("-hidden_size", type=int,
                     help="")
 
@@ -37,11 +37,11 @@ my_model = MaskRNN(
     regre_output_dim=REGRE_OUTPUT_DIM,
     hidden_size=args.hidden_size,
 )
-my_model.build_net(base_learning_rate=0.001)
+my_model.build_net(base_learning_rate=0.0001)
 my_model.draw_nets()
 my_model.train(
-    iters=1000,
-    iters_to_report=100,
+    iters=500,
+    iters_to_report=10,
 )
 # my_model.plot_loss_trend()
 

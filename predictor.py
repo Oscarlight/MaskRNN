@@ -6,7 +6,7 @@ from caffe2.python import (
 from eval import MAUC, calcBCA
 import matplotlib.pyplot as plt
 
-HIDDEN_DIM = 128
+HIDDEN_DIM = 16
 
 def predict(model_name, seq_lens, inputs, index):
 	inputs = np.transpose(inputs, (1, 0, 2))
@@ -63,19 +63,22 @@ def compute_mAUC_BCA(class_output, class_target, class_mask, start_end_index):
 				assert np.argmax(class_target[i, k, :]) == label[0]
 				#
 				data.append((label[0], class_output[i, k, :]))
-
-	return [MAUC(data, 3), calcBCA(estimLabels, trueLabels, 3)]
+	return [MAUC(data, 3), calcBCA(np.array(estimLabels), np.array(trueLabels), 3)]
 
 
 if __name__ == '__main__':
 	data_path = './data/'
-	model_name = 'model6/MaskRNN'
+	model_name = 'model9/MaskRNN'
 	# index = 100
 	tar_mean = np.load(data_path + 'tar_mean.npy').astype(np.float32)
 	tar_std = np.load(data_path + 'tar_std.npy').astype(np.float32)
+	print(tar_mean)
+	print(tar_std)
+	# quit()
 	# train, valid, test
 	error = {'train':[], 'valid':[], 'test':[]}
-	epochs = list(np.linspace(100, 900, num=9).astype(np.int32)) + [999]
+	epochs = list(np.linspace(0, 90, num=10).astype(np.int32))
+	# epochs = list(np.linspace(100, 900, num=9).astype(np.int32)) + [999]
 	# tests
 	for data_type in ['train','valid','test']:
 		(test_seq_lens, test_features, 
@@ -90,7 +93,7 @@ if __name__ == '__main__':
 			print('>> computing for ' + str(index))
 			target = predict(model_name, test_seq_lens, test_features, index)
 			test_regre_output = np.multiply(target[1], tar_std) + tar_mean
-			class_res = compute_mAUC_BCA(target[1], test_targets[:,:,0:3], 
+			class_res = compute_mAUC_BCA(target[0], test_targets[:,:,0:3], 
 				test_targets[:,:,6:7], test_start_end_index)
 			reg_res = compute_regre_error(test_regre_output, test_regre_target, 
 				test_targets[:,:,7:10], test_start_end_index)

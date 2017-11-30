@@ -311,14 +311,15 @@ class MaskRNN(object):
             CreateNetOnce(self.model.net)
             workspace.RunNet(self.model.net.Name())
 
-            if num_iter % iters_to_report == 0 and num_iter != 0:
+            if num_iter % iters_to_report == 0:
                 self.reports['epoch'].append(num_iter)
+                tmp_losses = []
                 for loss in self.loss:
                     loss = str(loss)
-                    loss_value = workspace.FetchBlob(loss)
+                    loss_value = np.asscalar(workspace.FetchBlob(loss))
                     self.reports[loss].append(loss_value)
-                    # print('num iter: %d ---- %s = %f'.format(
-                    #     num_iter, loss, loss_value))
+                    tmp_losses.append(loss_value)
+                print('num iter: ' + str(num_iter) + ' --- losses: ' + str(tmp_losses))
                 # Save Net
                 exporter.save_net(
                     self.model,
@@ -333,8 +334,8 @@ class MaskRNN(object):
         exporter.save_net(
             self.model,
             self.net_store['predict'],  
-            self.model_name+str(num_iter)+'_init',
-            self.model_name+str(num_iter)+'_predict' 
+            self.model_name+str(num_iter+1)+'_init',
+            self.model_name+str(num_iter+1)+'_predict' 
         )
 
         # Save report

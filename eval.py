@@ -121,5 +121,5 @@ def calcBCA(estimLabels, trueLabels, nrClasses):
       bcaCurr = 0.5*(sensitivity+specificity)
       bcaAll += [bcaCurr]
       # print('bcaCurr %f TP %f TN %f FP %f FN %f' % (bcaCurr, TP, TN, FP, FN))
-
+      
   return np.mean(bcaAll)
