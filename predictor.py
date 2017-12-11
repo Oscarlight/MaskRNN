@@ -5,8 +5,20 @@ from caffe2.python import (
 )
 from eval import MAUC, calcBCA
 import matplotlib.pyplot as plt
+import matplotlib
+from pylab import rcParams
+rcParams['figure.figsize'] = 7.6, 8
+matplotlib.rcParams.update({'font.size': 22})
 
-HIDDEN_DIM = 16
+HIDDEN_DIM = 8
+model_name = 'model10/MaskRNN'
+save_path = 'hiddenDim8/'
+# HIDDEN_DIM = 16
+# model_name = 'model9/MaskRNN'
+# save_path = 'hiddenDim16/'
+# HIDDEN_DIM = 32
+# model_name = 'model11/MaskRNN'
+# save_path = 'hiddenDim32/'
 
 def predict(model_name, seq_lens, inputs, index):
 	inputs = np.transpose(inputs, (1, 0, 2))
@@ -67,8 +79,7 @@ def compute_mAUC_BCA(class_output, class_target, class_mask, start_end_index):
 
 
 if __name__ == '__main__':
-	data_path = './data/'
-	model_name = 'model9/MaskRNN'
+	data_path = './data/npy4/'
 	# index = 100
 	tar_mean = np.load(data_path + 'tar_mean.npy').astype(np.float32)
 	tar_std = np.load(data_path + 'tar_std.npy').astype(np.float32)
@@ -77,7 +88,8 @@ if __name__ == '__main__':
 	# quit()
 	# train, valid, test
 	error = {'train':[], 'valid':[], 'test':[]}
-	epochs = list(np.linspace(0, 90, num=10).astype(np.int32))
+	# epochs = list(np.linspace(0, 90, num=10).astype(np.int32))
+	epochs = list(np.linspace(0, 500, num=51).astype(np.int32))
 	# epochs = list(np.linspace(100, 900, num=9).astype(np.int32)) + [999]
 	# tests
 	for data_type in ['train','valid','test']:
@@ -102,22 +114,32 @@ if __name__ == '__main__':
 	# print(error)
 	# quit()
 	errors_by_type = {'mAUC':[], 'BCA':[], 'vennorm':[], 'adas13':[], 'mmse':[]}
-	assert len(error['train'])==10
+	# assert len(error['train'])==10
 	for j in range(len(error['train'])): # epochs
 		for i, title in enumerate(['mAUC', 'BCA', 'vennorm', 'adas13', 'mmse']):
 			error_tvt = [error[data_type][j][i] for data_type in ['train','valid','test']]
 			errors_by_type[title].append(error_tvt)
 
 	# print(errors_by_type)
-
+	print('-'*50)
+	print(str(HIDDEN_DIM))
 	for i, title in enumerate(['mAUC', 'BCA', 'vennorm', 'adas13', 'mmse']):
 		err_array = np.array(errors_by_type[title])
 		# print(err_array)
-		plt.plot(epochs, err_array[:,0], label = 'train')
-		plt.plot(epochs, err_array[:,1], label = 'valid')
-		plt.plot(epochs, err_array[:,2], label = 'test')
+		plt.plot(epochs, err_array[:,0], linewidth=2, label = 'train')
+		plt.plot(epochs, err_array[:,1], linewidth=2, label = 'valid')
+		plt.plot(epochs, err_array[:,2], linewidth=2, label = 'test')
 		plt.legend()
-		plt.savefig(model_name.split('/')[0] + '_' + title + '.png')
+		plt.title(title)
+		plt.xlabel('epoch')
+		print(title)
+		if i > 1:
+			print(np.min(err_array[:,1]), np.min(err_array[:,2]))
+			plt.title(title + ' (MSE)' )
+		else:
+			plt.title(title)
+			print(np.max(err_array[:,1]), np.max(err_array[:,2]))
+		plt.savefig(save_path + model_name.split('/')[0] + '_' + title + '.pdf')
 		plt.clf()
 
 
